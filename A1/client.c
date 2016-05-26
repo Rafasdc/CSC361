@@ -85,25 +85,34 @@ parse_URI(char *uri, char *hostname, int *port, char *identifier)
 }
 
 /*------------------------------------*
-* connect to a HTTP server using hostname and port,
+* connect to a HTTP server using hostname and port,%s
 * and get the resource specified by identifier
 *--------------------------------------*/
 perform_http(int sockid, char *identifier)
 {
 
+
   char buffer[MAX_RES_LEN];
-  char * message = "GET http://www.csc.uvic.ca/index.htm HTTP/1.0\r\n\r\n";
+  char message[200];
+  strcpy(message, "GET ");
+  strcat(message, " /index.htm");
+  strcat(message, " HTTP/1.0\r\n\r\n");
+  printf("%s\n", message );
+
+  //char * message = "GET http://www.csc.uvic.ca/index.htm HTTP/1.0\r\n\r\n";
     if( send(sockid , message , strlen(message) , 0) < 0)
     {
         printf("Send failed\n");
-        exit(ERROR_EXIT);
+        exit(-1);
     }
 
     if( recv(sockid, buffer , MAX_RES_LEN-1 , 0) < 0)
     {
         printf("Receive failed\n");
+        exit(-1);
     }
 
+    puts(buffer);
    close(sockid);
 }
 
