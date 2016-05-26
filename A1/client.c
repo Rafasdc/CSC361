@@ -92,20 +92,17 @@ perform_http(int sockid, char *identifier)
 {
 
   char buffer[MAX_RES_LEN];
-  /* connect to server and retrieve response */
   char * message = "GET http://www.csc.uvic.ca/index.htm HTTP/1.0\r\n\r\n";
     if( send(sockid , message , strlen(message) , 0) < 0)
     {
-        puts("Send failed");
-        return 1;
+        printf("Send failed\n");
+        exit(ERROR_EXIT);
     }
 
-    //Receive a reply from the server
     if( recv(sockid, buffer , MAX_RES_LEN-1 , 0) < 0)
     {
-        puts("recv failed");
+        printf("Receive failed\n");
     }
-    puts(buffer);
 
    close(sockid);
 }

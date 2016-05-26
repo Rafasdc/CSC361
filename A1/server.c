@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,7 +30,8 @@ void cleanExit();
 main(int argc, char *argv)
 {
     int newsockid; /* return value of the accept() call */
-
+    int port,sockfd,newsockfd;
+    struct sockaddr_in serv_addr,cli_addr;
     while (1)
     {
       close(newsockid);
