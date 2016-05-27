@@ -54,9 +54,21 @@ main(int argc, char **argv)
 parse_URI(char *uri, char *hostname, int *port, char *identifier)
 {
 
-  strcpy(hostname,"uvic.ca");
-  *port = 80;
-  strcpy(identifier,"index.html");
+  if (strstr(uri,"http") == NULL && strstr(uri,"HTTP") == NULL){
+    perror("Not Valid URI\n");
+    exit(1);
+  }
+
+  if (strstr(uri,":") != NULL ){
+  sscanf(uri,"http://%[^:|/\n]:%d/%[^\n]",hostname,port,identifier);
+  } else {
+  scanf(uri,"http://%[^/]/%99s[^\n]",hostname,identifier);
+  }
+  printf("%s\n", hostname);
+  printf("%d\n",*port );
+  printf("%s\n", identifier);
+
+
 
 /*
   char * i;
@@ -127,6 +139,9 @@ int open_connection(char *hostname, int port)
 {
 
   int sockfd;
+  /* generate socket
+   * connect socket to the host address
+   */
   sockfd = socket(AF_INET,SOCK_STREAM,0);
   if (sockfd < 0){
     perror("ERROR Opening Socket\n");
@@ -136,11 +151,7 @@ int open_connection(char *hostname, int port)
   bzero(&sa, sizeof sa);
   sa.sin_family = AF_INET;
   sa.sin_port = htons(9898);
-
   inet_pton(AF_INET,"127.0.0.1",&(sa.sin_addr));
-  /* generate socket
-   * connect socket to the host address
-   */
 
   //printf("Before connect\n");
   connect(sockfd, (struct sockaddr *) &sa, sizeof(sa));
