@@ -5,19 +5,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 
 /*------------------------------
 * server.c
 * Description: HTTP server program
 * CSC 361
 * Instructor: Kui Wu
+* Student: Rafael Solorzano
+* V00838235
 -------------------------------*/
 
 
 #define MAX_STR_LEN 120         /* maximum string length */
 #define SERVER_PORT_ID 9898     /* server port number */
 
-void cleanExit();
+void cleanExit(int);
 
 /*---------------------main() routine--------------------------*
  * tasks for main
@@ -54,7 +57,7 @@ main(int argc, char *argv[])
     exit(1);
     */
 
-  port = SERVER_PORT_ID;
+    port = SERVER_PORT_ID;
 
     sockfd = socket(AF_INET,SOCK_STREAM,0);
 
@@ -73,6 +76,11 @@ main(int argc, char *argv[])
     }
     char buffer[256];
 
+    //Handle CTRL-C when server quit to close socket
+    //prevents error of Address in use
+    signal(SIGINT, cleanExit);
+
+    //Inifnite loop to get request from client
     while (1)
     {
       newsockid = accept(sockfd, (struct sockaddr*)NULL,NULL);
@@ -87,9 +95,10 @@ main(int argc, char *argv[])
  *
  *---------------------------------------------------------------------------*/
 
-void cleanExit()
+void cleanExit(int sig)
 {
-    printf("Cleaning on exit\n");
+    signal(sig,SIG_IGN);
+    printf("\nServer Closing... Cleaning\n");
     exit(0);
 }
 
@@ -101,10 +110,14 @@ void cleanExit()
 
 perform_http(int sockid)
 {
+  //status codes to send response
   char * not_implemented = "HTTP/1.0 501 Not Implemented\nServer: Linux\n";
   char * status_ok = "HTTP/1.0 200 OK\nServer: Linux\n";
   char * not_found = "HTTP/1.0 404 Not Found\nServer: Linux\n";
-  int n = 0;
+
+  int n = 0; //used for error checking
+
+  //buffer to get message sent by client
   char buffer[MAX_STR_LEN];
   n = read(sockid,buffer,255);
 
@@ -115,18 +128,21 @@ perform_http(int sockid)
 
   printf("Got a request!\n");
 
+  //parses request of client into method, identifier, and protocol
   char method[MAX_STR_LEN];
   char identifier[MAX_STR_LEN];
   char protocol[MAX_STR_LEN];
   sscanf(buffer,"%s %s %s",method,identifier,protocol);
   printf("%s %s %s\n", method, identifier, protocol);
 
+  //check if method is get and correct http protocol
   if (strstr(method,"GET") == NULL || strstr(protocol,"HTTP/1.0") == NULL){
     n = writen(sockid, not_implemented, MAX_STR_LEN);
     if (n < 0){
       perror("ERROR on write");
       exit(1);
     }
+  // if GET method and HTTP 1.0 then we get file requested
   } else {
     char file[MAX_STR_LEN];
     sprintf(file,".%s",identifier);
@@ -134,18 +150,33 @@ perform_http(int sockid)
     FILE *fp;
     fp = fopen(file,"r");
     if (fp == NULL){
+      //if the file does not exist then we seng 404 error
       n = writen(sockid,not_found,MAX_STR_LEN);
     } else {
+      //the file was opened succesfully so get the html data
       char html_file[250];
       int i = 0;
-      while(feof(fp)){
-        html_file[i] = fgetc(fp);
+      int c;
+      //copies the file into a char
+      while((c = getc(fp)) != EOF){
+        html_file[i] = c;
         i++;
       }
-      html_file[i] = '\0';
-      printf("%s\n", html_file);
-      n = writen(sockid, status_ok, MAX_STR_LEN);
-      n = writen(sockid,html_file,MAX_STR_LEN);
+      close(fp); //close fd to prevent memory leaks
+      html_file[i] = '\0'; //c style string needs null termination
+      //printf("%s\n", html_file); //debug line
+      //send status_ok
+      n = writen(sockid, status_ok, strlen(status_ok));
+      if (n < 0 ){
+        perror("Error on Write");
+        exit(1);
+      }
+      //send html file
+      n = writen(sockid,html_file,strlen(html_file));
+      if (n < 0 ){
+        perror("Error on Write");
+        exit(1);
+      }
 
     }
   }
