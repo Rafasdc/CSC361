@@ -101,7 +101,7 @@ void cleanExit()
 
 perform_http(int sockid)
 {
-  char * not_implemented = "HTTP/1.0 501 Not Implemented\n";
+  char * not_implemented = "HTTP/1.0 501 Not Implemented\nServer: Linux\n";
   char * status_ok = "HTTP/1.0 200 OK\nServer: Linux\n";
   char * not_found = "HTTP/1.0 404 Not Found\nServer: Linux\n";
   int n = 0;
@@ -136,7 +136,17 @@ perform_http(int sockid)
     if (fp == NULL){
       n = writen(sockid,not_found,MAX_STR_LEN);
     } else {
+      char html_file[250];
+      int i = 0;
+      while(feof(fp)){
+        html_file[i] = fgetc(fp);
+        i++;
+      }
+      html_file[i] = '\0';
+      printf("%s\n", html_file);
       n = writen(sockid, status_ok, MAX_STR_LEN);
+      n = writen(sockid,html_file,MAX_STR_LEN);
+
     }
   }
 
