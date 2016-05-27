@@ -40,7 +40,7 @@ main(int argc, char **argv)
 
     parse_URI(uri,hostname,&port,identifier);
     sockid = open_connection(hostname,port);
-    perform_http(sockid,uri);
+    perform_http(sockid,identifier,uri,hostname);
 
     //printf("%s\n", hostname);
     //printf("%s\n", identifier);
@@ -62,9 +62,9 @@ parse_URI(char *uri, char *hostname, int *port, char *identifier)
   if (sscanf(uri,"http://%[^:|/\n]:%d/%[^\n]",hostname,port,identifier) != 3){
     sscanf(uri,"http://%[^/\n]%[^\n]",hostname,identifier);
   }
-  printf("%s\n", hostname);
-  printf("%d\n",*port );
-  printf("%s\n", identifier);
+  //printf("%s\n", hostname);
+  //printf("%d\n",*port );
+  //printf("%s\n", identifier);
 
 
 
@@ -74,14 +74,16 @@ parse_URI(char *uri, char *hostname, int *port, char *identifier)
 * connect to a HTTP server using hostname and port,%s
 * and get the resource specified by identifier
 *--------------------------------------*/
-perform_http(int sockid, char *identifier)
+perform_http(int sockid, char *identifier, char *uri, char * hostname)
 {
 
 
   char buffer[MAX_RES_LEN];
   char message[200];
-  sprintf(message,"GET %s HTTP/1.0\r\n\r\n",identifier);
-  printf("%s\n", message );
+  sprintf(message,"GET %s HTTP/1.1\r\n\r\n",identifier);
+  printf("---Request Begin---\n");
+  printf("%s", message );
+  //printf("Host: %s\n", hostname );
 
   //char * message = "GET http://uvic.ca/index.html HTTP/1.0\r\n\r\n";
     if( send(sockid , message , strlen(message) , 0) < 0)
@@ -90,14 +92,18 @@ perform_http(int sockid, char *identifier)
         exit(1);
     }
 
+    printf("---Request end---\nHTTP request sent, awaiting response...\n\n");
+
     if( recv(sockid, buffer , MAX_RES_LEN-1 , 0) < 0)
     {
         perror("Receive failed\n");
         exit(1);
     }
 
+    printf("---Response header---\n");
+
     puts(buffer);
-   //close(sockid);
+    close(sockid);
 }
 
 /*---------------------------------------------------------------------------*

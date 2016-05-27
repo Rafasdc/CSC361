@@ -30,9 +30,8 @@ void cleanExit();
 main(int argc, char *argv)
 {
     int newsockid; /* return value of the accept() call */
-    int port,sockfd,newsockfd,clilen;
+    int port,sockfd,newsockfd;
     struct sockaddr_in serv_addr,cli_addr;
-    int n;
 
     port = SERVER_PORT_ID;
 
@@ -47,22 +46,18 @@ main(int argc, char *argv)
       exit(1);
     }
 
-    listen(sockfd,3);
-    clilen = sizeof(cli_addr);
-
-    newsockid = accept(sockfd, (struct sockaddr*)&cli_addr,&clilen);
-
+    if (listen(sockfd,3) < 0){
+      perror("ERROR on listen");
+      exit(1);
+    }
     char buffer[256];
-
 
     while (1)
     {
-      n = read(newsockid,buffer,255);
 
-      printf("%s\n", buffer);
-
-      n = write(newsockid, "HTTP",5);
-      //close(newsockid);
+      newsockid = accept(sockfd, (struct sockaddr*)NULL,NULL);
+      perform_http(newsockid);
+      close(newsockid);
     }
 }
 
@@ -85,5 +80,32 @@ void cleanExit()
 
 perform_http(int sockid)
 {
+  char * not_implemented = "HTTP/1.0 501 Not Implemented\n";
+  int n = 0;
+  char buffer[MAX_STR_LEN];
+  n = read(sockid,buffer,255);
+
+  if (n < 0){
+    perror("ERROR on read");
+    exit(1);
+  }
+
+  printf("Got a request!\n%s", buffer);
+
+  if (strstr(buffer,"GET") == NULL){
+    n = writen(sockid,not_implemented, MAX_STR_LEN);
+    if (n < 0){
+      perror("ERROR on write");
+      exit(1);
+    }
+  }
+
+  if (strstr(buffer,"HTTP/1.0") == NULL){
+    n = writen(sockid,not_implemented, MAX_STR_LEN);
+    if (n < 0){
+      perror("ERROR on wrie");
+      exit(1);
+    }
+  }
 
 }
