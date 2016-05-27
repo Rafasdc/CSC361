@@ -55,11 +55,11 @@ parse_URI(char *uri, char *hostname, int *port, char *identifier)
 {
 
   if (strstr(uri,"http") == NULL){
-    perror("Not Valid URI\n");
+    printf("Not Valid URI\n");
     exit(1);
   }
 
-  if (sscanf(uri,"http://%[^:|/\n]:%d/%[^\n]",hostname,port,identifier) != 3){
+  if (sscanf(uri,"http://%[^:|/\n]:%d%[^\n]",hostname,port,identifier) != 3){
     sscanf(uri,"http://%[^/\n]%[^\n]",hostname,identifier);
   }
   //printf("%s\n", hostname);
@@ -76,16 +76,15 @@ parse_URI(char *uri, char *hostname, int *port, char *identifier)
 *--------------------------------------*/
 perform_http(int sockid, char *identifier, char *uri, char * hostname)
 {
-
-
   char buffer[MAX_RES_LEN];
+  char rheader[MAX_RES_LEN];
+  char body [MAX_RES_LEN];
   char message[200];
-  sprintf(message,"GET %s HTTP/1.1\r\n\r\n",identifier);
+  sprintf(message,"GET %s HTTP/1.0\r\n\r\n",identifier);
   printf("---Request Begin---\n");
+  printf("Host: %s\n", hostname );
   printf("%s", message );
-  //printf("Host: %s\n", hostname );
 
-  //char * message = "GET http://uvic.ca/index.html HTTP/1.0\r\n\r\n";
     if( send(sockid , message , strlen(message) , 0) < 0)
     {
         perror("Send failed\n");
@@ -101,8 +100,15 @@ perform_http(int sockid, char *identifier, char *uri, char * hostname)
     }
 
     printf("---Response header---\n");
-
-    puts(buffer);
+    sscanf(buffer,"%[^<]",rheader);
+    puts (rheader);
+    printf("---Response body---\n");
+    char *e;
+    int index;
+    e = strchr(buffer,'<');
+    index = (int)(e-buffer);
+    strncpy(body,buffer+index,MAX_RES_LEN);
+    puts(body);
     close(sockid);
 }
 
@@ -121,7 +127,7 @@ int open_connection(char *hostname, int port)
    */
   sockfd = socket(AF_INET,SOCK_STREAM,0);
   if (sockfd < 0){
-    perror("ERROR Opening Socket\n");
+    perror("ERROR Opening Socket");
     exit(1);
   }
 
@@ -140,7 +146,7 @@ int open_connection(char *hostname, int port)
 
   //printf("Before connect\n");
   if (connect(sockfd, (struct sockaddr *) &sa, sizeof(sa))){
-    perror("Connect Failed\n");
+    perror("Connect Failed");
     exit(1);
   }
 

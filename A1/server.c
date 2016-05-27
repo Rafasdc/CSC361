@@ -27,13 +27,32 @@ void cleanExit();
  * Communicate with client and close new socket after done
  *---------------------------------------------------------------------------*/
 
-main(int argc, char *argv)
+main(int argc, char *argv[])
 {
     int newsockid; /* return value of the accept() call */
     int port,sockfd,newsockfd;
     struct sockaddr_in serv_addr,cli_addr;
+    char * directory;
 
-    port = SERVER_PORT_ID;
+
+    if (argc < 2){
+      printf("Usage:\n ./simpServer portnumber directoryofHTML\n or \n ./simpServer directoryofHTML (defaults to port 80)\n");
+      exit(1);
+    }
+
+    if (argc == 3){
+      port = atoi(argv[1]);
+      directory = argv[2];
+    } else if (argc == 2){
+      directory = argv[1];
+      port = 80;
+    }
+    printf("Directory:%s and Port:%d\n", directory,port);
+
+
+    exit(1);
+
+  port = SERVER_PORT_ID;
 
     sockfd = socket(AF_INET,SOCK_STREAM,0);
 
@@ -54,7 +73,6 @@ main(int argc, char *argv)
 
     while (1)
     {
-
       newsockid = accept(sockfd, (struct sockaddr*)NULL,NULL);
       perform_http(newsockid);
       close(newsockid);
@@ -69,6 +87,7 @@ main(int argc, char *argv)
 
 void cleanExit()
 {
+    printf("Cleaning on exit\n");
     exit(0);
 }
 
@@ -81,6 +100,8 @@ void cleanExit()
 perform_http(int sockid)
 {
   char * not_implemented = "HTTP/1.0 501 Not Implemented\n";
+  char * status_ok = "HTTP/1.0 200 OK\nServer: Linux\n";
+  char * not_found = "HTTP/1.0 404 Not Found\n";
   int n = 0;
   char buffer[MAX_STR_LEN];
   n = read(sockid,buffer,255);
@@ -90,22 +111,23 @@ perform_http(int sockid)
     exit(1);
   }
 
-  printf("Got a request!\n%s", buffer);
+  printf("Got a request!\n");
 
-  if (strstr(buffer,"GET") == NULL){
-    n = writen(sockid,not_implemented, MAX_STR_LEN);
+  char method[MAX_STR_LEN];
+  char identifier[MAX_STR_LEN];
+  char protocol[MAX_STR_LEN];
+  sscanf(buffer,"%s %s %s",method,identifier,protocol);
+  printf("%s %s %s\n", method, identifier, protocol);
+
+  if (strstr(method,"GET") == NULL || strstr(protocol,"HTTP/1.0") == NULL){
+    n = writen(sockid, not_implemented, MAX_STR_LEN);
     if (n < 0){
       perror("ERROR on write");
       exit(1);
     }
+  } else {
+    n = writen(sockid, status_ok, MAX_STR_LEN);
   }
 
-  if (strstr(buffer,"HTTP/1.0") == NULL){
-    n = writen(sockid,not_implemented, MAX_STR_LEN);
-    if (n < 0){
-      perror("ERROR on wrie");
-      exit(1);
-    }
-  }
 
 }
