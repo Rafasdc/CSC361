@@ -33,6 +33,7 @@ main(int argc, char **argv)
     char hostname[MAX_STR_LEN];
     char identifier[MAX_STR_LEN];
     int sockid, port;
+    port = 80;
 
     printf("Open URI:  ");
     scanf("%s", uri);
@@ -97,19 +98,19 @@ perform_http(int sockid, char *identifier)
   strcpy(message, "GET ");
   strcat(message, " /index.htm");
   strcat(message, " HTTP/1.0\r\n\r\n");
-  printf("%s\n", message );
+  //printf("%s\n", message );
 
   //char * message = "GET http://www.csc.uvic.ca/index.htm HTTP/1.0\r\n\r\n";
     if( send(sockid , message , strlen(message) , 0) < 0)
     {
-        printf("Send failed\n");
-        exit(-1);
+        perror("Send failed\n");
+        exit(1);
     }
 
     if( recv(sockid, buffer , MAX_RES_LEN-1 , 0) < 0)
     {
-        printf("Receive failed\n");
-        exit(-1);
+        perror("Receive failed\n");
+        exit(1);
     }
 
     puts(buffer);
@@ -127,12 +128,16 @@ int open_connection(char *hostname, int port)
 
   int sockfd;
   sockfd = socket(AF_INET,SOCK_STREAM,0);
+  if (sockfd < 0){
+    perror("ERROR Opening Socket\n");
+    exit(1);
+  }
   struct sockaddr_in sa;
   bzero(&sa, sizeof sa);
   sa.sin_family = AF_INET;
-  sa.sin_port = htons(80);
+  sa.sin_port = htons(9898);
 
-  inet_pton(AF_INET,"142.104.70.229",&(sa.sin_addr));
+  inet_pton(AF_INET,"127.0.0.1",&(sa.sin_addr));
   /* generate socket
    * connect socket to the host address
    */

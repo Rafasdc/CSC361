@@ -30,11 +30,39 @@ void cleanExit();
 main(int argc, char *argv)
 {
     int newsockid; /* return value of the accept() call */
-    int port,sockfd,newsockfd;
+    int port,sockfd,newsockfd,clilen;
     struct sockaddr_in serv_addr,cli_addr;
+    int n;
+
+    port = SERVER_PORT_ID;
+
+    sockfd = socket(AF_INET,SOCK_STREAM,0);
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(port);
+
+    if (bind(sockfd,(struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0){
+      perror("ERROR on binding");
+      exit(1);
+    }
+
+    listen(sockfd,3);
+    clilen = sizeof(cli_addr);
+
+    newsockid = accept(sockfd, (struct sockaddr*)&cli_addr,&clilen);
+
+    char buffer[256];
+
+
     while (1)
     {
-      close(newsockid);
+      n = read(newsockid,buffer,255);
+
+      printf("%s\n", buffer);
+
+      n = write(newsockid, "HTTP",5);
+      //close(newsockid);
     }
 }
 
