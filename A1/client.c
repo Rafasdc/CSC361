@@ -40,7 +40,7 @@ main(int argc, char **argv)
 
     parse_URI(uri,hostname,&port,identifier);
     sockid = open_connection(hostname,port);
-    perform_http(sockid,identifier);
+    perform_http(sockid,uri);
 
     //printf("%s\n", hostname);
     //printf("%s\n", identifier);
@@ -60,7 +60,7 @@ parse_URI(char *uri, char *hostname, int *port, char *identifier)
   }
 
   if (sscanf(uri,"http://%[^:|/\n]:%d/%[^\n]",hostname,port,identifier) != 3){
-    sscanf(uri,"http://%[^/\n]/%[^\n]",hostname,identifier);
+    sscanf(uri,"http://%[^/\n]%[^\n]",hostname,identifier);
   }
   printf("%s\n", hostname);
   printf("%d\n",*port );
@@ -80,12 +80,10 @@ perform_http(int sockid, char *identifier)
 
   char buffer[MAX_RES_LEN];
   char message[200];
-  strcpy(message, "GET ");
-  strcat(message, identifier);
-  strcat(message, " HTTP/1.0\r\n\r\n");
-  //printf("%s\n", message );
+  sprintf(message,"GET %s HTTP/1.0\r\n\r\n",identifier);
+  printf("%s\n", message );
 
-  //char * message = "GET http://www.csc.uvic.ca/index.htm HTTP/1.0\r\n\r\n";
+  //char * message = "GET http://uvic.ca/index.html HTTP/1.0\r\n\r\n";
     if( send(sockid , message , strlen(message) , 0) < 0)
     {
         perror("Send failed\n");
@@ -99,7 +97,7 @@ perform_http(int sockid, char *identifier)
     }
 
     puts(buffer);
-   close(sockid);
+   //close(sockid);
 }
 
 /*---------------------------------------------------------------------------*
@@ -120,16 +118,25 @@ int open_connection(char *hostname, int port)
     perror("ERROR Opening Socket\n");
     exit(1);
   }
+
+  struct hostent *hp = gethostbyname(hostname);
+
   struct sockaddr_in sa;
   bzero(&sa, sizeof sa);
+  memcpy(&sa.sin_addr,hp->h_addr,hp->h_length);
   sa.sin_family = AF_INET;
   sa.sin_port = htons(port);
-  char hstn[MAX_STR_LEN];
-  hstn = gethostbyname(hostname);
-  inet_pton(AF_INET,hstn,&(sa.sin_addr));
+  //inet_pton(AF_INET,server_ent->h_addr,&(sa.sin_addr));
+
+
+  //memcpy(&sa.sin_addr, server_ent->h_addr,server_ent->h_length);
+  //printf("%s\n", sa.sin_addr);
 
   //printf("Before connect\n");
-  connect(sockfd, (struct sockaddr *) &sa, sizeof(sa));
+  if (connect(sockfd, (struct sockaddr *) &sa, sizeof(sa))){
+    perror("Connect Failed\n");
+    exit(1);
+  }
 
 
 
