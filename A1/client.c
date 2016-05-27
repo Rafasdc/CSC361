@@ -54,45 +54,18 @@ main(int argc, char **argv)
 parse_URI(char *uri, char *hostname, int *port, char *identifier)
 {
 
-  if (strstr(uri,"http") == NULL && strstr(uri,"HTTP") == NULL){
+  if (strstr(uri,"http") == NULL){
     perror("Not Valid URI\n");
     exit(1);
   }
 
-  if (strstr(uri,":") != NULL ){
-  sscanf(uri,"http://%[^:|/\n]:%d/%[^\n]",hostname,port,identifier);
-  } else {
-  scanf(uri,"http://%[^/]/%99s[^\n]",hostname,identifier);
+  if (sscanf(uri,"http://%[^:|/\n]:%d/%[^\n]",hostname,port,identifier) != 3){
+    sscanf(uri,"http://%[^/\n]/%[^\n]",hostname,identifier);
   }
   printf("%s\n", hostname);
   printf("%d\n",*port );
   printf("%s\n", identifier);
 
-
-
-/*
-  char * i;
-  int double_slash = 0;
-  for (i=uri; *i; i++){
-    if (*i == '/'){
-      double_slash++;
-    }
-    if (double_slash == 2){
-      i++;
-      double_slash = 0;
-      while (1){
-
-        if(*i == '/' || *i == ':'){
-
-          break;
-        }
-        //printf("%s\n", i);
-        i++;
-
-      }
-    }
-  }
-  */
 
 
 }
@@ -108,7 +81,7 @@ perform_http(int sockid, char *identifier)
   char buffer[MAX_RES_LEN];
   char message[200];
   strcpy(message, "GET ");
-  strcat(message, " /index.htm");
+  strcat(message, identifier);
   strcat(message, " HTTP/1.0\r\n\r\n");
   //printf("%s\n", message );
 
@@ -150,8 +123,10 @@ int open_connection(char *hostname, int port)
   struct sockaddr_in sa;
   bzero(&sa, sizeof sa);
   sa.sin_family = AF_INET;
-  sa.sin_port = htons(9898);
-  inet_pton(AF_INET,"127.0.0.1",&(sa.sin_addr));
+  sa.sin_port = htons(port);
+  char hstn[MAX_STR_LEN];
+  hstn = gethostbyname(hostname);
+  inet_pton(AF_INET,hstn,&(sa.sin_addr));
 
   //printf("Before connect\n");
   connect(sockfd, (struct sockaddr *) &sa, sizeof(sa));
