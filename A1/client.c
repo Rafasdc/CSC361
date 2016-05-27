@@ -106,9 +106,13 @@ perform_http(int sockid, char *identifier, char *uri, char * hostname)
     char *e;
     int index;
     e = strchr(buffer,'<');
-    index = (int)(e-buffer);
-    strncpy(body,buffer+index,MAX_RES_LEN);
-    puts(body);
+    if (e == NULL){
+      //no body
+    } else {
+      index = (int)(e-buffer);
+      strncpy(body,buffer+index,MAX_RES_LEN);
+      puts(body);
+    }
     close(sockid);
 }
 

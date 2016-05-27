@@ -35,6 +35,7 @@ main(int argc, char *argv[])
     char * directory;
 
 
+/*
     if (argc < 2){
       printf("Usage:\n ./simpServer portnumber directoryofHTML\n or \n ./simpServer directoryofHTML (defaults to port 80)\n");
       exit(1);
@@ -51,6 +52,7 @@ main(int argc, char *argv[])
 
 
     exit(1);
+    */
 
   port = SERVER_PORT_ID;
 
@@ -101,7 +103,7 @@ perform_http(int sockid)
 {
   char * not_implemented = "HTTP/1.0 501 Not Implemented\n";
   char * status_ok = "HTTP/1.0 200 OK\nServer: Linux\n";
-  char * not_found = "HTTP/1.0 404 Not Found\n";
+  char * not_found = "HTTP/1.0 404 Not Found\nServer: Linux\n";
   int n = 0;
   char buffer[MAX_STR_LEN];
   n = read(sockid,buffer,255);
@@ -126,7 +128,16 @@ perform_http(int sockid)
       exit(1);
     }
   } else {
-    n = writen(sockid, status_ok, MAX_STR_LEN);
+    char file[MAX_STR_LEN];
+    sprintf(file,".%s",identifier);
+    printf("%s\n", file);
+    FILE *fp;
+    fp = fopen(file,"r");
+    if (fp == NULL){
+      n = writen(sockid,not_found,MAX_STR_LEN);
+    } else {
+      n = writen(sockid, status_ok, MAX_STR_LEN);
+    }
   }
 
 
