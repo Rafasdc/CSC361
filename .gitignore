@@ -31,3 +31,7 @@
 # Debug files
 *.dSYM/
 *.su
+
+A1/server
+
+A1/client
