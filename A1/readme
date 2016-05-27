@@ -1,0 +1,93 @@
+CSC361 Summer 2016 Assignment 1
+Rafael Solorzano
+V00838235
+
+Compile with make
+
+
+-------------------------- Client ----------------------------
+To Run: ./SimpClient
+Will prompt for URI:
+example:
+
+$ ./SimpClient
+Open URI:  http://solorzano.xyz/index.html
+---Request Begin---
+Host: solorzano.xyz
+GET /index.html HTTP/1.0
+
+---Request end---
+HTTP request sent, awaiting response...
+
+---Response header---
+HTTP/1.1 200 OK
+Server: nginx/1.4.6 (Ubuntu)
+Date: Fri, 27 May 2016 22:41:41 GMT
+Content-Type: text/html
+Content-Length: 612
+Last-Modified: Tue, 04 Mar 2014 11:46:45 GMT
+Connection: close
+ETag: "5315bd25-264"
+Accept-Ranges: bytes
+
+
+---Response body---
+<!DOCTYPE html>
+... Rest of body
+
+NOTE: Client will NOT work without http:// an error will be produced
+
+-------------------------- Server ----------------------------
+To Run we have three options:
+./SimpServer Will run the default options of port 9898 and directory of executable
+./SimpServer <portNumber> <directoryofHTML>
+./SimpServer <directoryofHTML> this options defaults to port 80 (requires sudo)
+
+NOTE: directory of HTML can be any valid linux path.
+Tested with:
+.
+/home/user/Desktop/test/
+www/ (included in submission)
+www/inside (included in submission)
+
+To Connect to Server from client:
+Use Client as usal with http://127.0.0.1:<port# if not 80>/index.html
+
+----------------------- Example Server-Client execution ----------------------
+
+---- SERVER ----
+$ ./SimpServer
+Starting Server with defaults
+ Directory = . Port = 9898
+Other Usage:
+ ./simpServer portnumber directoryofHTML
+ or
+ ./simpServer directoryofHTML (defaults to port 80)
+Server Started
+
+--- CLIENT ---
+Open URI:  http://127.0.0.1:9898/www/inside/index.html
+---Request Begin---
+Host: 127.0.0.1
+GET /www/inside/index.html HTTP/1.0
+
+---Request end---
+HTTP request sent, awaiting response...
+
+---Response header---
+HTTP/1.0 200 OK
+Server: Linux
+
+---Response body---
+<html>
+<head><title>Welcome to inside WWW</title></head>
+<body>
+<center><h1>This is the page</h1></center>
+<p>Served by my own server </p>
+</body>
+</html>
+
+------------------ OTHER NOTES--------------------------------
+
+To Produce 501 Code simply change client.c HTTP/1.1 or GET to POST.
+To Produce 404 Code request a non existent page i.e: /noexistent.no

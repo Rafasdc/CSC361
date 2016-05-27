@@ -6,11 +6,10 @@
 # compile client and server
 all: client server
 
-# compile client only 
+# compile client only
 client: client.o  util.o
-	gcc -g -o client client.o  util.o -lnsl
+	gcc -g -o SimpClient client.o  util.o -lnsl
 
 #compile server only
 server: server.o util.o
-	gcc -g -o server server.o util.o -lnsl
-
+	gcc -g -o SimpServer server.o util.o -lnsl

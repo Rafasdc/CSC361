@@ -37,28 +37,27 @@ main(int argc, char *argv[])
     struct sockaddr_in serv_addr,cli_addr;
     char * directory;
 
-
-/*
+    //Handle command line arguments
     if (argc < 2){
-      printf("Usage:\n ./simpServer portnumber directoryofHTML\n or \n ./simpServer directoryofHTML (defaults to port 80)\n");
-      exit(1);
+      printf("Starting Server with defaults\n Directory = . Port = 9898\n");
+      directory = ".";
+      port = SERVER_PORT_ID;
+      printf("Other Usage:\n ./simpServer portnumber directoryofHTML\n or \n ./simpServer directoryofHTML (defaults to port 80)\n");
     }
 
     if (argc == 3){
       port = atoi(argv[1]);
       directory = argv[2];
+      printf("Starting Server with\n Directory:%s and Port:%d\n", directory,port);
     } else if (argc == 2){
       directory = argv[1];
       port = 80;
+      printf("Starting Server with\n Directory:%s and Port:%d\n", directory,port);
     }
-    printf("Directory:%s and Port:%d\n", directory,port);
 
 
-    exit(1);
-    */
 
-    port = SERVER_PORT_ID;
-
+    //creat socket and connect
     sockfd = socket(AF_INET,SOCK_STREAM,0);
 
     serv_addr.sin_family = AF_INET;
@@ -70,6 +69,7 @@ main(int argc, char *argv[])
       exit(1);
     }
 
+    //listen for connections
     if (listen(sockfd,3) < 0){
       perror("ERROR on listen");
       exit(1);
@@ -80,11 +80,13 @@ main(int argc, char *argv[])
     //prevents error of Address in use
     signal(SIGINT, cleanExit);
 
+    printf("Server Started\n");
+
     //Inifnite loop to get request from client
     while (1)
     {
       newsockid = accept(sockfd, (struct sockaddr*)NULL,NULL);
-      perform_http(newsockid);
+      perform_http(newsockid, directory);
       close(newsockid);
     }
 }
@@ -108,7 +110,7 @@ void cleanExit(int sig)
  *
  *---------------------------------------------------------------------------*/
 
-perform_http(int sockid)
+perform_http(int sockid, char * directory)
 {
   //status codes to send response
   char * not_implemented = "HTTP/1.0 501 Not Implemented\nServer: Linux\n";
@@ -126,14 +128,14 @@ perform_http(int sockid)
     exit(1);
   }
 
-  printf("Got a request!\n");
+  //printf("Got a request!\n");//debug
 
   //parses request of client into method, identifier, and protocol
   char method[MAX_STR_LEN];
   char identifier[MAX_STR_LEN];
   char protocol[MAX_STR_LEN];
-  sscanf(buffer,"%s %s %s",method,identifier,protocol);
-  printf("%s %s %s\n", method, identifier, protocol);
+  sscanf(buffer,"%s  %s %s",method,identifier,protocol);
+  //printf("%s %s %s\n", method, identifier, protocol); //debug
 
   //check if method is get and correct http protocol
   if (strstr(method,"GET") == NULL || strstr(protocol,"HTTP/1.0") == NULL){
@@ -145,8 +147,14 @@ perform_http(int sockid)
   // if GET method and HTTP 1.0 then we get file requested
   } else {
     char file[MAX_STR_LEN];
-    sprintf(file,".%s",identifier);
+    //Handles double / when directory is not .
+    if (directory[strlen(directory)-1] == '/'){
+      directory[strlen(directory)-1] = 0;
+    }
+    //creates path to pass to fopen
+    sprintf(file,"%s%s",directory,identifier);
     printf("%s\n", file);
+    //open file to get html file
     FILE *fp;
     fp = fopen(file,"r");
     if (fp == NULL){
