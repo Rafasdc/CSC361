@@ -57,7 +57,7 @@ int main(int argc, char **argv)
   printf("\nA) Total number of connections: %d\n", total_connections);
   printf("___________________________\n");
   print_connections();
-  //print_general();
+  print_general();
   //print_complete();
   return 0;
 }
@@ -94,22 +94,36 @@ void print_connections(){
     printf("Start Time:\n");
     printf("EndTime:\n");
     printf("Duration:\n");
-    printf("Number of packets sent from Source to Destination: \n");
-    printf("Number of Packets sent from Destination to Source: \n");
-    printf("Total number of packets: \n");
-    printf("Number of data bytes sent from Source to Destination: \n");
-    printf("Number of data bytes sent from Destination to Source: \n");
-    printf("Total number of data bytes: \n");
+    printf("Number of packets sent from Source to Destination: %d \n",connections[i].num_packet_src);
+    printf("Number of Packets sent from Destination to Source: %d\n",connections[i].num_packet_dst);
+    printf("Total number of packets: %d \n",connections[i].num_total_packets);
+    printf("Number of data bytes sent from Source to Destination: %d\n",connections[i].cur_data_len_src);
+    printf("Number of data bytes sent from Destination to Source: %d\n",connections[i].cur_data_len_dst);
+    printf("Total number of data bytes: %d\n",connections[i].cur_total_data_len);
     //end of connection
     printf("END\n++++++++++++++++++++++++++++++++++++++\n");
   }
 }
 
 void print_general(){
+  int i = 0;
+  int complete_tcp = 0;
+  int reset_tcp = 0;
+  int still_open = 0;
+  for(;i< total_connections; i++){
+    if(connections[i].rst_count>0){
+      reset_tcp++;
+    }
+    if (connections[i].syn_count > 0 && connections[i].fin_count>0){
+      complete_tcp++;
+    } else {
+      still_open++;
+    }
+  }
   printf("C) General\n\n");
-  printf("Total number of complete TCP connections: \n");
-  printf("Number of reset TCP connections: \n");
-  printf("Number of TCP connections that were still open when the trace capture ended\n");
+  printf("Total number of complete TCP connections: %d\n",complete_tcp);
+  printf("Number of reset TCP connections: %d\n",reset_tcp);
+  printf("Number of TCP connections that were still open when the trace capture ended: %d\n", still_open);
   printf("\n______________________________________________\n");
 }
 
@@ -211,6 +225,10 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
       connections[total_connections].rst_count+=1;
     }
     //TODO add the rest of fields
+    connections[total_connections].num_packet_src++;
+    connections[total_connections].num_total_packets++;
+    connections[total_connections].cur_data_len_src += tcp->th_win;
+    connections[total_connections].cur_total_data_len += tcp->th_win;
     total_connections++;
     return;
   }
@@ -226,7 +244,6 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
   }
   if (match == 0){
   //no match
-  total_connections++;
   strcpy(connections[total_connections].ip_src, inet_ntoa(ip->ip_src));
   strcpy(connections[total_connections].ip_dst, inet_ntoa(ip->ip_dst));
   connections[total_connections].port_src = ntohs(tcp->th_sport);
@@ -241,6 +258,11 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
   } else if (tcp->th_flags & TH_RST){
     connections[total_connections].rst_count+=1;
   }
+  connections[total_connections].num_packet_src++;
+  connections[total_connections].num_total_packets++;
+  connections[total_connections].cur_data_len_src += tcp->th_win;
+  connections[total_connections].cur_total_data_len += tcp->th_win;
+  total_connections++;
 } else if (match == 1){
   //match is at i
   //we have a match and have to handle modify the connection to which packet matched
@@ -255,6 +277,23 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
     //printf("in RST\n");
     connections[i].rst_count+=1;
   }
+  //update endtime everytime a match is found this will be useful later
+  connections[i].ending_time = ts;
+
+  //handle packets and data sent
+  if(connections[i].port_src == ntohs(tcp->th_dport) && connections[i].port_dst == ntohs(tcp->th_sport)
+  && !strcmp(connections[i].ip_dst,inet_ntoa(ip->ip_src)) && !strcmp(connections[i].ip_src,inet_ntoa(ip->ip_dst))){
+    connections[i].num_packet_dst++;
+    connections[i].num_total_packets++;
+    connections[i].cur_data_len_dst += tcp->th_win;
+    connections[i].cur_total_data_len += tcp->th_win;
+  } else {
+    connections[i].num_packet_src++;
+    connections[i].num_total_packets++;
+    connections[i].cur_data_len_src += tcp->th_win;
+    connections[i].cur_total_data_len += tcp->th_win;
+  }
+
 
 }
 
