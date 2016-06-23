@@ -1,6 +1,12 @@
 #include <stdio.h>
 #include <pcap.h>
 #include <stdlib.h>
+#include <string.h>
+
+#include <netinet/in.h>
+#include <netinet/ip.h>
+#include <net/if.h>
+#include <netinet/if_ether.h>
 
 /*
 struct TCP_hdr {
@@ -15,11 +21,34 @@ struct TCP_hdr {
 
 //void parse_packet(struct timeval ts, )
 
+struct TCP_hdr {
+  u_short th_sport;	/* source port */
+  u_short th_dport;	/* destination port */
+  unsigned int th_seq;		/* sequence number */
+  unsigned int th_ack;		/* acknowledgement number */
+  u_char th_offx2;	/* data offset, rsvd */
+#define TH_OFF(th)	(((th)->th_offx2 & 0xf0) >> 4)
+  u_char th_flags;
+#define TH_FIN 0x01
+#define TH_SYN 0x02
+#define TH_RST 0x04
+#define TH_PUSH 0x08
+#define TH_ACK 0x10
+#define TH_URG 0x20
+#define TH_ECE 0x40
+#define TH_CWR 0x80
+#define TH_FLAGS (TH_FIN|TH_SYN|TH_RST|TH_ACK|TH_URG|TH_ECE|TH_CWR)
+  u_short th_win;		/* window */
+  u_short th_sum;		/* checksum */
+  u_short th_urp;		/* urgent pointer */
+};
+
+
 void print_connections();
 void print_general();
 void print_complete();
 
-
+void parse_packet(const unsigned char *packet, struct timeval ts, unsigned int capture_len);
 
 int main(int argc, char **argv)
 {
@@ -42,7 +71,7 @@ int main(int argc, char **argv)
    }
 
    while (packet = pcap_next(handle,&header)) {
-
+     parse_packet(packet,header.ts,header.caplen);
       packet_counter++;
 
     }
@@ -51,9 +80,9 @@ int main(int argc, char **argv)
 
   printf("\nA) Total number of connections: %d\n", packet_counter);
   printf("___________________________\n");
-  print_connections();
-  print_general();
-  print_complete();
+  //print_connections();
+  //print_general();
+  //print_complete();
   return 0;
 }
 
@@ -100,6 +129,45 @@ void print_complete(){
   printf("Mean received window size including both send/received:\n");
   printf("Maximum received window size including both send/received:\n\n");
   printf("_____________________________________________\n");
+}
+
+void parse_packet(const unsigned char *packet, struct timeval ts, unsigned int capture_len){
+  struct ip *ip;
+  struct TCP_hdr *tcp;
+  unsigned int IP_header_length;
+
+  //Skip over Ethernet header
+  packet += sizeof(struct ether_header);
+  capture_len -= sizeof(struct ether_header);
+
+  if (capture_len < sizeof(struct ip)){
+    printf("IP header too short");
+    exit(-1);
+  }
+
+  //get ip header size
+  ip = (struct ip*) packet;
+  IP_header_length = ip->ip_hl * 4;
+
+  //check ip header size
+  if (capture_len < IP_header_length){
+    printf("IP header with options too short");
+    exit(-1);
+  }
+
+  //get to the TCP header
+  packet += IP_header_length;
+  capture_len -+ IP_header_length;
+
+  tcp = (struct TCP_hdr*) packet;
+
+  if (capture_len < sizeof(struct TCP_hdr)){
+    printf("TCP Header too short");
+    exit(-1);
+  }
+
+  printf("src_port=%d dst_port=%d\n",ntohs(tcp->th_sport),ntohs(tcp->th_dport));
+
 
 
 
