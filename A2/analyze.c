@@ -54,7 +54,7 @@ int main(int argc, char **argv)
 
   printf("\nA) Total number of connections: %d\n", total_connections);
   printf("___________________________\n");
-  //print_connections();
+  print_connections();
   //print_general();
   //print_complete();
   return 0;
@@ -63,21 +63,24 @@ int main(int argc, char **argv)
 void print_connections(){
   printf("\nB) Connections' details\n\n");
   //while still connection info to print
-  printf("Connection :\nSource Address:\nDestination Address:\n,Source Port:\n");
-  printf("Destinantion Port:\n");
-  printf("Status:\n");
-  //if complete printf
-  printf("Start Time:\n");
-  printf("EndTime:\n");
-  printf("Duration:\n");
-  printf("Number of packets sent from Source to Destination: \n");
-  printf("Number of Packets sent from Destination to Source: \n");
-  printf("Total number of packets: \n");
-  printf("Number of data bytes sent from Source to Destination: \n");
-  printf("Number of data bytes sent from Destination to Source: \n");
-  printf("Total number of data bytes: \n");
-  //end of connection
-  printf("END\n++++++++++++++++++++++++++++++++++++++\n");
+  int i = 0;
+  for (; i < total_connections; i++){
+    printf("Connection %d:\nSource Address: %s\nDestination Address: %s\nSource Port: %d\n", i+1, connections[i].ip_src,connections[i].ip_dst, connections[i].port_src);
+    printf("Destinantion Port: %d\n", connections[i].port_dst);
+    printf("Status:\n");
+    //if complete printf
+    printf("Start Time:\n");
+    printf("EndTime:\n");
+    printf("Duration:\n");
+    printf("Number of packets sent from Source to Destination: \n");
+    printf("Number of Packets sent from Destination to Source: \n");
+    printf("Total number of packets: \n");
+    printf("Number of data bytes sent from Source to Destination: \n");
+    printf("Number of data bytes sent from Destination to Source: \n");
+    printf("Total number of data bytes: \n");
+    //end of connection
+    printf("END\n++++++++++++++++++++++++++++++++++++++\n");
+  }
 }
 
 void print_general(){
@@ -152,6 +155,21 @@ void parse_packet(const unsigned char *packet, struct timeval ts, unsigned int c
 
 }
 
+//TODO function to handle num_packet from source and num_packet from dst and also for bytes
+//TODO function to count syn, fin and rst and add them to connection
+//TODO RTT function
+
+/*
+ To obtain the RTT times for a complete TCP connection, you can take this approach:
+  (1) First RTT: The time when the first SYN is sent to the time when the first SYN+ACK is received.
+  (you need to compare the seq number and the ack number to find the match.
+  (2) Second RTT: the time when the first DATA/ACK is sent to the time when the first ACK/DATA is received,
+  (you need to compare the seq number and the ack number to find the match).
+  (3) Third RTT: the time when the next DATA/ACK is sent to the time when the next ACK/DATA is received.
+  (you need to compare the seq number and the ack number to find the match).......
+  The last RTT: the last match between FIN and ACK.
+*/
+
 void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, const char *payload){
   int i = 0;
   int match = 0;
@@ -161,6 +179,14 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
     connections[total_connections].port_src = ntohs(tcp->th_sport);
     connections[total_connections].port_dst = ntohs(tcp->th_dport);
     connections[total_connections].is_set = 1;
+    connections[total_connections].starting_time = ts;
+    if (tcp->th_flags == TH_FIN){
+      connections[total_connections].fin_count+=1;
+    } else if (tcp->th_flags == TH_SYN){
+      connections[total_connections].syn_count+=1;
+    } else if (tcp->th_flags == TH_RST){
+      connections[total_connections].rst_count+=1;
+    }
     //TODO add the rest of fields
     total_connections++;
     return;
@@ -171,6 +197,7 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
     (connections[i].port_src == ntohs(tcp->th_dport) && connections[i].port_dst == ntohs(tcp->th_sport)
     && !strcmp(connections[i].ip_dst,inet_ntoa(ip->ip_src)) && !strcmp(connections[i].ip_src,inet_ntoa(ip->ip_dst)))){
       match = 1;
+      //the matched connection is at i, this is the one we are going to modify if syn, fin, rst and add packets to
       break;
     }
   }
@@ -182,6 +209,14 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
   connections[total_connections].port_src = ntohs(tcp->th_sport);
   connections[total_connections].port_dst = ntohs(tcp->th_dport);
   connections[total_connections].is_set = 1;
+  connections[total_connections].starting_time = ts;
+  if (tcp->th_flags == TH_FIN){
+    connections[total_connections].fin_count+=1;
+  } else if (tcp->th_flags == TH_SYN){
+    connections[total_connections].syn_count+=1;
+  } else if (tcp->th_flags == TH_RST){
+    connections[total_connections].rst_count+=1;
+  }
 }
 
 
