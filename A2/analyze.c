@@ -67,6 +67,7 @@ void print_connections(){
   for (; i < total_connections; i++){
     printf("Connection %d:\nSource Address: %s\nDestination Address: %s\nSource Port: %d\n", i+1, connections[i].ip_src,connections[i].ip_dst, connections[i].port_src);
     printf("Destinantion Port: %d\n", connections[i].port_dst);
+    printf("SYN: %d, FIN %d, RST %d\n",connections[i].syn_count,connections[i].fin_count,connections[i].rst_count);
     if (connections[i].rst_count > 1){
     printf("Status: R\n");
     }
@@ -186,11 +187,11 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
     connections[total_connections].is_set = 1;
     connections[total_connections].starting_time = ts;
     //printf("flag is %d\n",tcp->th_flags);
-    if (tcp->th_flags == TH_FIN){
+    if (tcp->th_flags & TH_FIN){
       connections[total_connections].fin_count+=1;
-    } else if (tcp->th_flags == TH_SYN){
+    } else if (tcp->th_flags & TH_SYN){
       connections[total_connections].syn_count+=1;
-    } else if (tcp->th_flags == TH_RST){
+    } else if (tcp->th_flags & TH_RST){
       connections[total_connections].rst_count+=1;
     }
     //TODO add the rest of fields
@@ -216,23 +217,29 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
   connections[total_connections].port_dst = ntohs(tcp->th_dport);
   connections[total_connections].is_set = 1;
   connections[total_connections].starting_time = ts;
-  if (tcp->th_flags == TH_FIN){
+
+  if (tcp->th_flags & TH_FIN){
     connections[total_connections].fin_count+=1;
-  } else if (tcp->th_flags == TH_SYN){
+  } else if (tcp->th_flags & TH_SYN){
     connections[total_connections].syn_count+=1;
-  } else if (tcp->th_flags == TH_RST){
+  } else if (tcp->th_flags & TH_RST){
     connections[total_connections].rst_count+=1;
   }
-} else {
+} else if (match == 1){
   //match is at i
   //we have a match and have to handle modify the connection to which packet matched
-  if (tcp->th_flags == TH_FIN){
+
+  if (tcp->th_flags & TH_FIN){
+    //printf("in RST\n");
     connections[i].fin_count+=1;
-  } else if (tcp->th_flags == TH_SYN){
+  } else if (tcp->th_flags & TH_SYN){
+    //printf("in SYN\n");
     connections[i].syn_count+=1;
-  } else if (tcp->th_flags == TH_RST){
+  } else if (tcp->th_flags & TH_RST){
+    //printf("in RST\n");
     connections[i].rst_count+=1;
   }
+
 }
 
 
