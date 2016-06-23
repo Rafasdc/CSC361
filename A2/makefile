@@ -3,5 +3,5 @@
 all: analyze
 
 # compile analyzer only
-client: analyze.c
-	gcc -g -c analyze.c -o analyze -lpcap
+analyze: analyze.c
+	gcc analyze.c -o analyze -lpcap
