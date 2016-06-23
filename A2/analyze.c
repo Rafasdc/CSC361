@@ -38,6 +38,8 @@ int main(int argc, char **argv)
    char errbuf[PCAP_ERRBUF_SIZE];
    handle = pcap_open_offline(argv[1], errbuf);
 
+   //TODO filter out HTTP packets and other packets use only TCP
+
    if (handle == NULL) {
      fprintf(stderr,"Couldn't open pcap file %s: %s\n", argv[1], errbuf);
      return(2);
@@ -67,12 +69,26 @@ void print_connections(){
   for (; i < total_connections; i++){
     printf("Connection %d:\nSource Address: %s\nDestination Address: %s\nSource Port: %d\n", i+1, connections[i].ip_src,connections[i].ip_dst, connections[i].port_src);
     printf("Destinantion Port: %d\n", connections[i].port_dst);
-    printf("SYN: %d, FIN %d, RST %d\n",connections[i].syn_count,connections[i].fin_count,connections[i].rst_count);
-    if (connections[i].rst_count > 1){
+    int syn = connections[i].syn_count;
+    int fin = connections[i].fin_count;
+    int rst = connections[i].rst_count;
+    if (connections[i].rst_count > 0){
     printf("Status: R\n");
     }
-    else {
-      printf("Status: \n");
+    else if (syn == 1 && fin == 0){
+      printf("Status: S1F0\n");
+    } else if (syn ==2 && fin == 0){
+      printf("Status: S2F0\n");
+    }else if (syn == 1 && fin == 1){
+      printf("Status: S1F1\n");
+    } else if (syn ==2 && fin ==1){
+      printf("Status: S2F1\n");
+    } else if (syn == 2 && fin ==2){
+      printf("Status: S2F2\n");
+    } else if (syn == 0 && fin ==1){
+      printf("Status: S0F1\n");
+    } else if (syn == 0 && fin == 2){
+      printf("Status: S0F2\n");
     }
     //if complete printf
     printf("Start Time:\n");
