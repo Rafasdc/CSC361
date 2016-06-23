@@ -1,31 +1,10 @@
-//Headers from Programming with PCAP Library documentations
-/* Ethernet header */
-	struct sniff_ethernet {
-		u_char ether_dhost[ETHER_ADDR_LEN]; /* Destination host address */
-		u_char ether_shost[ETHER_ADDR_LEN]; /* Source host address */
-		u_short ether_type; /* IP? ARP? RARP? etc */
-	};
+//Headers based from Programming with PCAP Library documentations and Lab Session 6
 
-	/* IP header */
-	struct sniff_ip {
-		u_char ip_vhl;		/* version << 4 | header length >> 2 */
-		u_char ip_tos;		/* type of service */
-		u_short ip_len;		/* total length */
-		u_short ip_id;		/* identification */
-		u_short ip_off;		/* fragment offset field */
-	#define IP_RF 0x8000		/* reserved fragment flag */
-	#define IP_DF 0x4000		/* dont fragment flag */
-	#define IP_MF 0x2000		/* more fragments flag */
-	#define IP_OFFMASK 0x1fff	/* mask for fragmenting bits */
-		u_char ip_ttl;		/* time to live */
-		u_char ip_p;		/* protocol */
-		u_short ip_sum;		/* checksum */
-		struct in_addr ip_src,ip_dst; /* source and dest address */
-	};
-	#define IP_HL(ip)		(((ip)->ip_vhl) & 0x0f)
-	#define IP_V(ip)		(((ip)->ip_vhl) >> 4)
+#define MAX_STR_LEN 100
+#define MAX_NUM_CONNECTION 1000
 
 
+/* TCP Header */
 struct TCP_hdr {
   u_short th_sport;	/* source port */
   u_short th_dport;	/* destination port */
@@ -46,4 +25,31 @@ struct TCP_hdr {
   u_short th_win;		/* window */
   u_short th_sum;		/* checksum */
   u_short th_urp;		/* urgent pointer */
+};
+
+struct connection{
+  char ip_src[MAX_STR_LEN];  /*source ip*/
+  char ip_dst[MAX_STR_LEN];  /*destination ip*/
+  uint16_t port_src;
+  uint16_t port_dst;
+  int syn_count;
+  int fin_count;
+  int rst_count;
+  struct timeval starting_time;
+  struct timeval ending_time;
+  double duration;
+  int num_packet_src;     /*number of packets sent out by source*/
+  int num_packet_dst;     /*number of packets sent out by destination*/
+  int num_total_packets;
+  int cur_data_len_src;   /*num data bytes*/
+  int cur_data_len_dst;   /*num data bytes*/
+  int cur_total_data_len;
+  uint16_t max_win_size;  /*max window size*/
+  uint16_t min_win_size;  /*min window size*/
+  double sum_win_size;
+  //struct round_trip rtt_ary_src[MAX_NUM_CONNECTION/4]; /*assume 1000*/
+  int rtt_ary_src_len;    /*the size of the rtt_ary_src array*/
+  //struct round_trip rtt_ary_dst[MAX_NUM_CONNECTION/4]; /*assume 1000*/
+  int rtt_ary_dst_len;    /*the size of the rtt_ary_dst array*/
+  int is_set;
 };

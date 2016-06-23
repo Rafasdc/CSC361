@@ -7,8 +7,10 @@
 #include <netinet/ip.h>
 #include <net/if.h>
 #include <netinet/if_ether.h>
+#include <arpa/inet.h>
 
 #include "headers.h"
+
 
 
 void print_connections();
@@ -16,6 +18,10 @@ void print_general();
 void print_complete();
 
 void parse_packet(const unsigned char *packet, struct timeval ts, unsigned int capture_len);
+void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, const char *payload);
+
+struct connection connections[MAX_NUM_CONNECTION];
+int total_connections = 0;
 
 int main(int argc, char **argv)
 {
@@ -37,6 +43,7 @@ int main(int argc, char **argv)
      return(2);
    }
 
+   total_connections = 0;
    while (packet = pcap_next(handle,&header)) {
      parse_packet(packet,header.ts,header.caplen);
       packet_counter++;
@@ -45,7 +52,7 @@ int main(int argc, char **argv)
     pcap_close(handle);
 
 
-  printf("\nA) Total number of connections: %d\n", packet_counter);
+  printf("\nA) Total number of connections: %d\n", total_connections);
   printf("___________________________\n");
   //print_connections();
   //print_general();
@@ -99,9 +106,10 @@ void print_complete(){
 }
 
 void parse_packet(const unsigned char *packet, struct timeval ts, unsigned int capture_len){
-  struct ip *ip;
-  struct TCP_hdr *tcp;
-  unsigned int IP_header_length;
+  struct ip *ip; //ip header
+  struct TCP_hdr *tcp; //tcp header
+  unsigned int IP_header_length; //ip header length
+  const char *payload;
 
   //Skip over Ethernet header
   packet += sizeof(struct ether_header);
@@ -109,31 +117,72 @@ void parse_packet(const unsigned char *packet, struct timeval ts, unsigned int c
 
   if (capture_len < sizeof(struct ip)){
     printf("IP header too short");
-    exit(-1);
+    return;
   }
 
-  //get ip header size
+  //get ip header size and ip header
   ip = (struct ip*) packet;
   IP_header_length = ip->ip_hl * 4;
 
   //check ip header size
   if (capture_len < IP_header_length){
     printf("IP header with options too short");
-    exit(-1);
+    return;
   }
 
   //get to the TCP header
   packet += IP_header_length;
-  capture_len -+ IP_header_length;
+  capture_len -= IP_header_length;
 
   tcp = (struct TCP_hdr*) packet;
 
   if (capture_len < sizeof(struct TCP_hdr)){
     printf("TCP Header too short");
-    exit(-1);
+    return;
   }
 
-  printf("src_port=%d dst_port=%d\n",ntohs(tcp->th_sport),ntohs(tcp->th_dport));
+  //get the payload
+  packet += TH_OFF(tcp)*4;
+  payload = (u_char *)packet;
+
+
+  check_connection(ip,tcp,ts,payload);
+  //char *addr = inet_ntoa(ip->ip_src);
+  //printf("src addr=%s dst addr = %s,src_port=%d dst_port=%d\n",addr,inet_ntoa(ip->ip_dst),ntohs(tcp->th_sport),ntohs(tcp->th_dport));
+
+}
+
+void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, const char *payload){
+  int i = 0;
+  int match = 0;
+  if (total_connections == 0){
+    strcpy(connections[total_connections].ip_src, inet_ntoa(ip->ip_src));
+    strcpy(connections[total_connections].ip_dst, inet_ntoa(ip->ip_dst));
+    connections[total_connections].port_src = ntohs(tcp->th_sport);
+    connections[total_connections].port_dst = ntohs(tcp->th_dport);
+    connections[total_connections].is_set = 1;
+    //TODO add the rest of fields
+    total_connections++;
+    return;
+  }
+  for (; i <= total_connections; i++){
+    if ((connections[i].port_src == ntohs(tcp->th_sport) && connections[i].port_dst == ntohs(tcp->th_dport)
+    && !strcmp(connections[i].ip_dst,inet_ntoa(ip->ip_dst)) && !strcmp(connections[i].ip_src,inet_ntoa(ip->ip_src))) ||
+    (connections[i].port_src == ntohs(tcp->th_dport) && connections[i].port_dst == ntohs(tcp->th_sport)
+    && !strcmp(connections[i].ip_dst,inet_ntoa(ip->ip_src)) && !strcmp(connections[i].ip_src,inet_ntoa(ip->ip_dst)))){
+      match = 1;
+      break;
+    }
+  }
+  if (match == 0){
+  //no match
+  total_connections++;
+  strcpy(connections[total_connections].ip_src, inet_ntoa(ip->ip_src));
+  strcpy(connections[total_connections].ip_dst, inet_ntoa(ip->ip_dst));
+  connections[total_connections].port_src = ntohs(tcp->th_sport);
+  connections[total_connections].port_dst = ntohs(tcp->th_dport);
+  connections[total_connections].is_set = 1;
+}
 
 
 
