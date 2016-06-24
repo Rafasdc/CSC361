@@ -372,7 +372,7 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
           connections[i].rtt_array[connections[i].rtt_array_len].ack = (ntohs(tcp->th_seq)-connection_first_seq)+1;
           connections[i].rtt_array[connections[i].rtt_array_len].starting_time = ts;
           connections[i].rtt_array[connections[i].rtt_array_len].looking_match_seq = 1;
-          printf("ACK in HERE IS %d with i = %d\n",(ntohs(tcp->th_ack)-connection_first_seq)+1, i);
+          printf("ACK in HERE IS %d with i = %d\n",connections[i].rtt_array[connections[i].rtt_array_len].ack, i);
       }
     }
   } else if (tcp->th_flags & TH_RST){
