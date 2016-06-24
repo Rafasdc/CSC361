@@ -278,6 +278,7 @@ void parse_packet(const unsigned char *packet, struct timeval ts, unsigned int c
 void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, const char *payload,unsigned int capture_len){
   int i = 0;
   int match = 0;
+  //printf(" Win: %d\n", ntohs(tcp->th_win));
   if (total_connections == 0){
     strcpy(connections[total_connections].ip_src, inet_ntoa(ip->ip_src));
     strcpy(connections[total_connections].ip_dst, inet_ntoa(ip->ip_dst));
@@ -293,6 +294,8 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
       connections[total_connections].syn_count+=1;
       connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].starting_time = ts;
       connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].syn_count++;
+      printf("SEQ FIRST IS %d",ntohs(tcp->th_seq));
+      connections[i].rtt_array[connections[i].rtt_array_len].looking_syn_ack = 1;
     } else if (tcp->th_flags & TH_RST){
       connections[total_connections].rst_count+=1;
     }
@@ -300,9 +303,9 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
     connections[total_connections].num_total_packets++;
     connections[total_connections].cur_data_len_src += capture_len;
     connections[total_connections].cur_total_data_len += capture_len;
-    connections[total_connections].max_win_size = tcp->th_win;
-    connections[total_connections].min_win_size = tcp->th_win;
-    connections[total_connections].sum_win_size += tcp->th_win;
+    connections[total_connections].max_win_size = ntohs(tcp->th_win);
+    connections[total_connections].min_win_size = ntohs(tcp->th_win);
+    connections[total_connections].sum_win_size += ntohs(tcp->th_win);
     total_connections++;
     return;
   }
@@ -331,6 +334,7 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
     connections[total_connections].syn_count+=1;
     connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].starting_time = ts;
     connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].syn_count++;
+    connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].looking_syn_ack == 1;
   } else if (tcp->th_flags & TH_RST){
     connections[total_connections].rst_count+=1;
   }
@@ -338,9 +342,9 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
   connections[total_connections].num_total_packets++;
   connections[total_connections].cur_data_len_src += capture_len;
   connections[total_connections].cur_total_data_len += capture_len;
-  connections[total_connections].max_win_size = tcp->th_win;
-  connections[total_connections].min_win_size = tcp->th_win;
-  connections[total_connections].sum_win_size += tcp->th_win;
+  connections[total_connections].max_win_size = ntohs(tcp->th_win);
+  connections[total_connections].min_win_size = ntohs(tcp->th_win);
+  connections[total_connections].sum_win_size += ntohs(tcp->th_win);
   total_connections++;
 } else if (match == 1){
   //match is at i
@@ -355,10 +359,19 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
   } else if (tcp->th_flags & TH_SYN){
     //printf("in SYN\n");
     connections[i].syn_count+=1;
-    if (tcp->th_flags & TH_ACK){
-      connections[i].rtt_array[connections[i].rtt_array_len].ending_time = ts;
-      connections[i].rtt_array[connections[i].rtt_array_len].syn_count++;
-      connections[i].rtt_array_len++;
+    if (tcp->th_flags & TH_ACK ){
+      printf("SYN and ACK\n");
+      if (1){
+        //printf("SYN and ACK\n");
+          connections[i].rtt_array[connections[i].rtt_array_len].ending_time = ts;
+          connections[i].rtt_array[connections[i].rtt_array_len].syn_count++;
+          connections[i].rtt_array[connections[i].rtt_array_len].looking_syn_ack == 0;
+          connections[i].rtt_array_len++;
+          connections[i].rtt_array[connections[i].rtt_array_len].ack = ntohs(tcp->th_ack);
+          connections[i].rtt_array[connections[i].rtt_array_len].starting_time = ts;
+          connections[i].rtt_array[connections[i].rtt_array_len].looking_match_seq = 1;
+          printf("ACK in HERE IS %d with i = %d\n",ntohs(tcp->th_ack), i);
+      }
     }
   } else if (tcp->th_flags & TH_RST){
     //printf("in RST\n");
@@ -366,13 +379,16 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
   }
 
   if (tcp->th_flags & TH_ACK){
-    if (connections[i].rtt_array[connections[i].rtt_array_len].ack == 0){
-      connections[i].rtt_array[connections[i].rtt_array_len].ack = tcp->th_ack;
+    if (connections[i].rtt_array[connections[i].rtt_array_len].looking_match_seq == 0 && connections[i].rtt_array[connections[i].rtt_array_len].looking_match_seq == 0){
+      connections[i].rtt_array[connections[i].rtt_array_len].ack = ntohs(tcp->th_ack);
       connections[i].rtt_array[connections[i].rtt_array_len].starting_time = ts;
-    } else if (tcp->th_seq == connections[i].rtt_array[connections[i].rtt_array_len].ack){
+      connections[i].rtt_array[connections[i].rtt_array_len].looking_match_seq = 1;
+    } else if (ntohs(tcp->th_seq) == connections[i].rtt_array[connections[i].rtt_array_len].ack && connections[i].rtt_array[connections[i].rtt_array_len].looking_match_seq == 1 ){
       //found the pair
+      printf ("SEQ is %d and ACK is %d i is %d \n ", ntohs(tcp->th_seq), connections[i].rtt_array[connections[i].rtt_array_len].ack, i);
       connections[i].rtt_array[connections[i].rtt_array_len].ending_time = ts;
-      connections[i].rtt_array[connections[i].rtt_array_len].seq = tcp->th_seq;
+      connections[i].rtt_array[connections[i].rtt_array_len].seq = ntohs(tcp->th_seq);
+      connections[i].rtt_array[connections[i].rtt_array_len].looking_match_seq == 0;
       connections[i].rtt_array_len++;
     }
   }
@@ -392,13 +408,13 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
     connections[i].cur_data_len_src += capture_len;
     connections[i].cur_total_data_len += capture_len;
   }
-  if (tcp->th_win > connections[i].max_win_size){
-    connections[i].max_win_size = tcp->th_win;
+  if (ntohs(tcp->th_win) > connections[i].max_win_size){
+    connections[i].max_win_size = ntohs(tcp->th_win);
   }
-  if (tcp->th_win < connections[i].min_win_size){
-    connections[i].min_win_size = tcp->th_win;
+  if (ntohs(tcp->th_win) < connections[i].min_win_size){
+    connections[i].min_win_size = ntohs(tcp->th_win);
   }
-  connections[i].sum_win_size += tcp->th_win;
+  connections[i].sum_win_size += ntohs(tcp->th_win);
 
 
   }
@@ -418,14 +434,16 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
 */
 void calculate_rtt(){
   int i = 0;
-  int j = 0;
+
   time_t initial_time;
   initial_time = first_time.tv_sec;
   double init_time = (double)initial_time;
   init_time += (1.0/1000000)*first_time.tv_usec;
   for (;i<total_connections;i++){
-    if (connections[i].syn_count > 0 && connections[i].fin_count > 0){
-      for (;j<connections[i].rtt_array_len;j++){
+    int j = 0;
+    if (connections[i].syn_count > 0 && connections[i].fin_count>0){
+      while(j<connections[i].rtt_array_len){
+        printf("%d\n",i);
         //calculate rtt for all connections and update min max and add them all to get mean
         time_t start_time = connections[i].rtt_array[j].starting_time.tv_sec;
         double startt = (double)start_time;
@@ -436,7 +454,7 @@ void calculate_rtt(){
         endt +=(1.0/1000000)*connections[i].rtt_array[j].ending_time.tv_usec;
         endt -= init_time;
         double duration = endt-startt;
-        printf("%f\n", duration);
+        printf("RTT %f from connection %d\n", duration, i);
         mean_rtt += duration;
         rtt_total++;
         if (duration > max_rtt){
@@ -447,6 +465,7 @@ void calculate_rtt(){
         } else if (duration < min_rtt) {
           min_rtt = duration;
         }
+        j++;
       }
     }
   }

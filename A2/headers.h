@@ -34,6 +34,8 @@ struct rtt_info{
   int ack;
   int fin_count;
   int syn_count;
+  int looking_syn_ack;
+  int looking_match_seq;
 };
 
 struct connection{
