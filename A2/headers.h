@@ -30,6 +30,7 @@ struct TCP_hdr {
 struct rtt_info{
   struct timeval starting_time;
   struct timeval ending_time;
+  int first_seq;
   int seq;
   int ack;
   int fin_count;

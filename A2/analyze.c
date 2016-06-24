@@ -42,7 +42,6 @@ int complete_tcp = 0;
 int reset_tcp = 0;
 int still_open = 0;
 int rtt_total = 0;
-int first_seq;
 
 int main(int argc, char **argv)
 {
@@ -295,9 +294,9 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
       connections[total_connections].syn_count+=1;
       connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].starting_time = ts;
       connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].syn_count++;
-      first_seq = ntohs(tcp->th_seq);
-      connections[i].rtt_array[connections[i].rtt_array_len].looking_syn_ack = 1;
-      connections[i].rtt_array[connections[i].rtt_array_len].seq = 0;
+      connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].first_seq = ntohs(tcp->th_seq);
+      connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].looking_syn_ack = 1;
+      connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].seq = 0;
     } else if (tcp->th_flags & TH_RST){
       connections[total_connections].rst_count+=1;
     }
@@ -337,7 +336,7 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
     connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].starting_time = ts;
     connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].syn_count++;
     connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].looking_syn_ack = 1;
-    connections[i].rtt_array[connections[i].rtt_array_len].seq = (ntohs(tcp->th_ack)-first_seq);
+    connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].first_seq = ntohs(tcp->th_seq);
   } else if (tcp->th_flags & TH_RST){
     connections[total_connections].rst_count+=1;
   }
@@ -352,7 +351,7 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
 } else if (match == 1){
   //match is at i
   //we have a match and have to handle modify the connection to which packet matched
-
+  int connection_first_seq = connections[i].rtt_array[0].first_seq;
   if (tcp->th_flags & TH_FIN){
     //printf("in RST\n");
     connections[i].fin_count+=1;
@@ -364,16 +363,16 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
     connections[i].syn_count+=1;
     if (tcp->th_flags & TH_ACK ){
       //printf("SYN and ACK\n");
-      if (connections[i].rtt_array[connections[i].rtt_array_len].seq == (ntohs(tcp->th_ack)-first_seq)){
+      if (connections[i].rtt_array[connections[i].rtt_array_len].seq == (ntohs(tcp->th_ack)-connection_first_seq)){
         //printf("SYN and ACK\n");
           connections[i].rtt_array[connections[i].rtt_array_len].ending_time = ts;
           connections[i].rtt_array[connections[i].rtt_array_len].syn_count++;
           connections[i].rtt_array[connections[i].rtt_array_len].looking_syn_ack = 0;
           connections[i].rtt_array_len++;
-          connections[i].rtt_array[connections[i].rtt_array_len].ack = (ntohs(tcp->th_ack)-first_seq)+1;
+          connections[i].rtt_array[connections[i].rtt_array_len].ack = (ntohs(tcp->th_seq)-connection_first_seq)+1;
           connections[i].rtt_array[connections[i].rtt_array_len].starting_time = ts;
           connections[i].rtt_array[connections[i].rtt_array_len].looking_match_seq = 1;
-          printf("ACK in HERE IS %d with i = %d\n",(ntohs(tcp->th_ack)-first_seq)+1, i);
+          printf("ACK in HERE IS %d with i = %d\n",(ntohs(tcp->th_ack)-connection_first_seq)+1, i);
       }
     }
   } else if (tcp->th_flags & TH_RST){
@@ -382,15 +381,15 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
   }
 
   if (tcp->th_flags & TH_ACK){
-    if (connections[i].rtt_array[connections[i].rtt_array_len].looking_match_seq == 0 && connections[i].rtt_array[connections[i].rtt_array_len].looking_match_seq == 0){
-      connections[i].rtt_array[connections[i].rtt_array_len].ack = ntohs(tcp->th_ack)-first_seq+1;
+    if (connections[i].rtt_array[connections[i].rtt_array_len].looking_match_seq == 0){
+      connections[i].rtt_array[connections[i].rtt_array_len].ack = (ntohs(tcp->th_seq)-connection_first_seq)+1;
       connections[i].rtt_array[connections[i].rtt_array_len].starting_time = ts;
       connections[i].rtt_array[connections[i].rtt_array_len].looking_match_seq = 1;
-    } else if ((ntohs(tcp->th_seq)-first_seq)+1 == connections[i].rtt_array[connections[i].rtt_array_len].ack && connections[i].rtt_array[connections[i].rtt_array_len].looking_match_seq == 1 ){
+    } else if ((ntohs(tcp->th_seq)-connection_first_seq) == connections[i].rtt_array[connections[i].rtt_array_len].ack && connections[i].rtt_array[connections[i].rtt_array_len].looking_match_seq == 1 ){
       //found the pair
-      printf ("SEQ is %d and ACK is %d\n ", (ntohs(tcp->th_seq)-first_seq), connections[i].rtt_array[connections[i].rtt_array_len].ack);
+      printf ("SEQ is %d and ACK is %d with i = %d\n ", (ntohs(tcp->th_seq)-connection_first_seq), connections[i].rtt_array[connections[i].rtt_array_len].ack,i);
       connections[i].rtt_array[connections[i].rtt_array_len].ending_time = ts;
-      connections[i].rtt_array[connections[i].rtt_array_len].seq = (ntohs(tcp->th_seq)-first_seq);
+      connections[i].rtt_array[connections[i].rtt_array_len].seq = (ntohs(tcp->th_seq)-connection_first_seq);
       connections[i].rtt_array[connections[i].rtt_array_len].looking_match_seq = 0;
       connections[i].rtt_array_len++;
     }
