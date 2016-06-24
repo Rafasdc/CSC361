@@ -1,0 +1,31 @@
+Rafael Solorzano
+V00838235
+CSC361 Summer 2016 Assignment 2
+
+------------------------------------------------------------------------------
+
+TO COMPILE
+
+run make
+
+------------------------------------------------------------------------------
+
+TO USE
+
+./analyze <capture file to analyze>
+
+example:
+
+./analyze sample-capture-file
+
+This will produce the output as required according to the specifications
+provided in Connex in resources/outputformat.pdf
+
+-------------------------------------------------------------------------------
+
+INFO
+
+If a connection included a reset in it the status of the connections was
+reported only as R, even if the connection had other status aside from that, this is
+according to mentioned in chat that were the two options of handling the connections
+with both types of status, I decided to only print R as the status if it contained a reset.

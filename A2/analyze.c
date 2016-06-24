@@ -13,15 +13,22 @@
 #include "headers.h"
 
 
-
+//handles the output and prints the connections
 void print_connections();
+//creates and prints the required general information
 void print_general();
+//uses information from the previos two functions to print the data pertaining to the
+//complete TCP connections
 void print_complete();
 
+//parses the packet
 void parse_packet(const unsigned char *packet, struct timeval ts, unsigned int capture_len);
+//check the packet and add its info to the correspoding connection
 void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, const char *payload,unsigned int capture_len);
+//calculates rtt
 void calculate_rtt();
 
+//global variable for easier printing and manipulation
 struct connection connections[MAX_NUM_CONNECTION];
 int total_connections = 0;
 struct timeval first_time;
@@ -92,6 +99,8 @@ void print_connections(){
     if (connections[i].rst_count > 0){
     printf("Status: R\n");
     }
+    //check status and prints corresponding
+    //read README for explanation of R handling
     else if (syn == 1 && fin == 0){
       printf("Status: S1F0\n");
     } else if (syn ==2 && fin == 0){
@@ -108,25 +117,28 @@ void print_connections(){
       printf("Status: S0F2\n");
     }
 
-    if (connections[i].syn_count > 0 && connections[i].fin_count>0){
+    if (connections[i].syn_count > 0 && connections[i].fin_count>0){ //check connection complete
 
+      //get the start time
       time_t start_time = connections[i].starting_time.tv_sec;
       double startt = (double)start_time;
       startt += (1.0/1000000)*connections[i].starting_time.tv_usec;
       startt -= init_time;
 
-
+      //get the endtime
       time_t end_time = connections[i].ending_time.tv_sec;
       double endt = (double)end_time;
       endt+=(1.0/1000000)*connections[i].ending_time.tv_usec;
       endt -= init_time;
 
-
+      //get the duration of the connection
       double duration = endt-startt;
       mean_duration += duration;
       if (duration > max_duration){
         max_duration = duration;
       }
+
+      //min, max and mean handlers above
       if (min_duration == 0){
         min_duration = duration;
       } else if (duration < min_duration) {
@@ -155,7 +167,7 @@ void print_connections(){
       total_windows += connections[i].num_total_packets;
       mean_window += connections[i].sum_win_size;
 
-
+      //start printing
       printf("Start Time: %f\n",startt);
       printf("End Time: %f\n",endt);
       printf("Duration: %f\n",duration);
@@ -173,7 +185,7 @@ void print_connections(){
 
 void print_general(){
   int i = 0;
-
+  //calculate the reset, complete and open connections
   for(;i< total_connections; i++){
     if(connections[i].rst_count>0){
       reset_tcp++;
@@ -184,6 +196,7 @@ void print_general(){
       still_open++;
     }
   }
+  //prints the above info in required format
   printf("C) General\n\n");
   printf("Total number of complete TCP connections: %d\n",complete_tcp);
   printf("Number of reset TCP connections: %d\n",reset_tcp);
@@ -191,6 +204,7 @@ void print_general(){
   printf("\n______________________________________________\n");
 }
 
+//prints the information of complete TCP connections using all the global variables previosly declared
 void print_complete(){
   printf("D) Complete TCP connections\n");
   printf("Minimum time durations: %f\n",min_duration);
@@ -257,20 +271,9 @@ void parse_packet(const unsigned char *packet, struct timeval ts, unsigned int c
 
 }
 
-//TODO function to handle num_packet from source and num_packet from dst and also for bytes
-//TODO function to count syn, fin and rst and add them to connection
-//TODO RTT function
 
-/*
- To obtain the RTT times for a complete TCP connection, you can take this approach:
-  (1) First RTT: The time when the first SYN is sent to the time when the first SYN+ACK is received.
-  (you need to compare the seq number and the ack number to find the match.
-  (2) Second RTT: the time when the first DATA/ACK is sent to the time when the first ACK/DATA is received,
-  (you need to compare the seq number and the ack number to find the match).
-  (3) Third RTT: the time when the next DATA/ACK is sent to the time when the next ACK/DATA is received.
-  (you need to compare the seq number and the ack number to find the match).......
-  The last RTT: the last match between FIN and ACK.
-*/
+
+
 
 void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, const char *payload,unsigned int capture_len){
   int i = 0;
@@ -398,12 +401,21 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
   connections[i].sum_win_size += tcp->th_win;
 
 
-}
-
-
-
+  }
 
 }
+//TODO fix RTT function and Window size
+
+/*
+ To obtain the RTT times for a complete TCP connection, you can take this approach:
+  (1) First RTT: The time when the first SYN is sent to the time when the first SYN+ACK is received.
+  (you need to compare the seq number and the ack number to find the match.
+  (2) Second RTT: the time when the first DATA/ACK is sent to the time when the first ACK/DATA is received,
+  (you need to compare the seq number and the ack number to find the match).
+  (3) Third RTT: the time when the next DATA/ACK is sent to the time when the next ACK/DATA is received.
+  (you need to compare the seq number and the ack number to find the match).......
+  The last RTT: the last match between FIN and ACK.
+*/
 void calculate_rtt(){
   int i = 0;
   int j = 0;
