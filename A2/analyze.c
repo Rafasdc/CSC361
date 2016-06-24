@@ -8,6 +8,7 @@
 #include <net/if.h>
 #include <netinet/if_ether.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 #include "headers.h"
 
@@ -18,10 +19,15 @@ void print_general();
 void print_complete();
 
 void parse_packet(const unsigned char *packet, struct timeval ts, unsigned int capture_len);
-void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, const char *payload);
+void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, const char *payload,unsigned int capture_len);
 
 struct connection connections[MAX_NUM_CONNECTION];
 int total_connections = 0;
+struct timeval first_time;
+int min_packets, mean_packets, max_packets = 0;
+int mean_window, max_window = 0;
+int min_window = -1;
+double min_duration, mean_duration, max_duration = 0;
 
 int main(int argc, char **argv)
 {
@@ -58,17 +64,23 @@ int main(int argc, char **argv)
   printf("___________________________\n");
   print_connections();
   print_general();
-  //print_complete();
+
+  print_complete();
   return 0;
 }
 
 void print_connections(){
+  time_t initial_time;
+  initial_time = first_time.tv_sec;
+  double init_time = (double)initial_time;
+  init_time += (1.0/1000000)*first_time.tv_usec;
+  printf("%f\n",init_time);
   printf("\nB) Connections' details\n\n");
   //while still connection info to print
   int i = 0;
   for (; i < total_connections; i++){
     printf("Connection %d:\nSource Address: %s\nDestination Address: %s\nSource Port: %d\n", i+1, connections[i].ip_src,connections[i].ip_dst, connections[i].port_src);
-    printf("Destinantion Port: %d\n", connections[i].port_dst);
+    printf("Destination Port: %d\n", connections[i].port_dst);
     int syn = connections[i].syn_count;
     int fin = connections[i].fin_count;
     int rst = connections[i].rst_count;
@@ -91,16 +103,65 @@ void print_connections(){
       printf("Status: S0F2\n");
     }
     //if complete printf
-    printf("Start Time:\n");
-    printf("EndTime:\n");
-    printf("Duration:\n");
-    printf("Number of packets sent from Source to Destination: %d \n",connections[i].num_packet_src);
-    printf("Number of Packets sent from Destination to Source: %d\n",connections[i].num_packet_dst);
-    printf("Total number of packets: %d \n",connections[i].num_total_packets);
-    printf("Number of data bytes sent from Source to Destination: %d\n",connections[i].cur_data_len_src);
-    printf("Number of data bytes sent from Destination to Source: %d\n",connections[i].cur_data_len_dst);
-    printf("Total number of data bytes: %d\n",connections[i].cur_total_data_len);
-    //end of connection
+
+      time_t start_time = connections[i].starting_time.tv_sec;
+      double startt = (double)start_time;
+      startt += (1.0/1000000)*connections[i].starting_time.tv_usec;
+      startt -= init_time;
+
+
+      time_t end_time = connections[i].ending_time.tv_sec;
+      double endt = (double)end_time;
+      endt+=(1.0/1000000)*connections[i].ending_time.tv_usec;
+      endt -= init_time;
+
+
+      double duration = endt-startt;
+      mean_duration += duration;
+      if (duration > max_duration){
+        max_duration = duration;
+      }
+      if (min_duration == 0){
+        min_duration = duration;
+      } else if (duration < min_duration) {
+        min_duration = duration;
+      }
+
+      int total_packets = connections[i].num_total_packets;
+      mean_packets += total_packets;
+      if (total_packets > max_packets){
+        max_packets = total_packets;
+      }
+      if (min_packets == 0){
+        min_packets = total_packets;
+      } else if (total_packets < min_packets){
+        min_packets = total_packets;
+      }
+
+      if (connections[i].max_win_size > max_window){
+        max_window = connections[i].max_win_size;
+      }
+      if (min_window == -1){
+        min_window = connections[i].min_win_size;
+      } else if (connections[i].min_win_size < min_window){
+        min_window = connections[i].min_win_size;
+      }
+
+      mean_window += connections[i].sum_win_size;
+
+
+    if (connections[i].syn_count > 0 && connections[i].fin_count>0){
+      printf("Start Time: %f\n",startt);
+      printf("End Time: %f\n",endt);
+      printf("Duration: %f\n",duration);
+      printf("Number of packets sent from Source to Destination: %d \n",connections[i].num_packet_src);
+      printf("Number of Packets sent from Destination to Source: %d\n",connections[i].num_packet_dst);
+      printf("Total number of packets: %d \n",connections[i].num_total_packets);
+      printf("Number of data bytes sent from Source to Destination: %d\n",connections[i].cur_data_len_src);
+      printf("Number of data bytes sent from Destination to Source: %d\n",connections[i].cur_data_len_dst);
+      printf("Total number of data bytes: %d\n",connections[i].cur_total_data_len);
+      //end of connection
+    }
     printf("END\n++++++++++++++++++++++++++++++++++++++\n");
   }
 }
@@ -129,18 +190,18 @@ void print_general(){
 
 void print_complete(){
   printf("D) Complete TCP connections\n");
-  printf("Minimum time durations: \n");
-  printf("Mean time durations: \n");
-  printf("Maximum time durations: \n\n");
+  printf("Minimum time durations: %f\n",min_duration);
+  printf("Mean time durations: %f\n",mean_duration/total_connections);
+  printf("Maximum time durations: %f\n\n",max_duration);
   printf("Minimum RTT values including both send/received:\n");
   printf("Mean RTT values including both send/received: \n");
   printf("Maximum RTT values including both send/received: \n\n");
-  printf("Minimum number of packets including both send/received:\n");
-  printf("Mean number of packets including both send/received:\n");
-  printf("Maximum number of packets including both send/received:\n\n");
-  printf("Minimum received window size including both send/received:\n");
-  printf("Mean received window size including both send/received:\n");
-  printf("Maximum received window size including both send/received:\n\n");
+  printf("Minimum number of packets including both send/received: %d\n",min_packets);
+  printf("Mean number of packets including both send/received: %d\n", mean_packets/total_connections);
+  printf("Maximum number of packets including both send/received: %d\n\n",max_packets);
+  printf("Minimum received window size including both send/received: %d\n", min_window);
+  printf("Mean received window size including both send/received: %d\n", mean_window/total_connections);
+  printf("Maximum received window size including both send/received: %d\n\n",max_window);
   printf("_____________________________________________\n");
 }
 
@@ -149,6 +210,7 @@ void parse_packet(const unsigned char *packet, struct timeval ts, unsigned int c
   struct TCP_hdr *tcp; //tcp header
   unsigned int IP_header_length; //ip header length
   const char *payload;
+  unsigned int capture_len_original = capture_len;
 
   //Skip over Ethernet header
   packet += sizeof(struct ether_header);
@@ -185,7 +247,7 @@ void parse_packet(const unsigned char *packet, struct timeval ts, unsigned int c
   payload = (u_char *)packet;
 
 
-  check_connection(ip,tcp,ts,payload);
+  check_connection(ip,tcp,ts,payload,capture_len_original);
   //char *addr = inet_ntoa(ip->ip_src);
   //printf("src addr=%s dst addr = %s,src_port=%d dst_port=%d\n",addr,inet_ntoa(ip->ip_dst),ntohs(tcp->th_sport),ntohs(tcp->th_dport));
 
@@ -206,7 +268,7 @@ void parse_packet(const unsigned char *packet, struct timeval ts, unsigned int c
   The last RTT: the last match between FIN and ACK.
 */
 
-void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, const char *payload){
+void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, const char *payload,unsigned int capture_len){
   int i = 0;
   int match = 0;
   if (total_connections == 0){
@@ -215,6 +277,7 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
     connections[total_connections].port_src = ntohs(tcp->th_sport);
     connections[total_connections].port_dst = ntohs(tcp->th_dport);
     connections[total_connections].is_set = 1;
+    first_time = ts;
     connections[total_connections].starting_time = ts;
     //printf("flag is %d\n",tcp->th_flags);
     if (tcp->th_flags & TH_FIN){
@@ -227,8 +290,11 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
     //TODO add the rest of fields
     connections[total_connections].num_packet_src++;
     connections[total_connections].num_total_packets++;
-    connections[total_connections].cur_data_len_src += tcp->th_win;
-    connections[total_connections].cur_total_data_len += tcp->th_win;
+    connections[total_connections].cur_data_len_src += capture_len;
+    connections[total_connections].cur_total_data_len += capture_len;
+    connections[total_connections].max_win_size = tcp->th_win;
+    connections[total_connections].min_win_size = tcp->th_win;
+    connections[total_connections].sum_win_size += tcp->th_win;
     total_connections++;
     return;
   }
@@ -260,8 +326,11 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
   }
   connections[total_connections].num_packet_src++;
   connections[total_connections].num_total_packets++;
-  connections[total_connections].cur_data_len_src += tcp->th_win;
-  connections[total_connections].cur_total_data_len += tcp->th_win;
+  connections[total_connections].cur_data_len_src += capture_len;
+  connections[total_connections].cur_total_data_len += capture_len;
+  connections[total_connections].max_win_size = tcp->th_win;
+  connections[total_connections].min_win_size = tcp->th_win;
+  connections[total_connections].sum_win_size += tcp->th_win;
   total_connections++;
 } else if (match == 1){
   //match is at i
@@ -285,14 +354,21 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
   && !strcmp(connections[i].ip_dst,inet_ntoa(ip->ip_src)) && !strcmp(connections[i].ip_src,inet_ntoa(ip->ip_dst))){
     connections[i].num_packet_dst++;
     connections[i].num_total_packets++;
-    connections[i].cur_data_len_dst += tcp->th_win;
-    connections[i].cur_total_data_len += tcp->th_win;
+    connections[i].cur_data_len_dst += capture_len;
+    connections[i].cur_total_data_len += capture_len;
   } else {
     connections[i].num_packet_src++;
     connections[i].num_total_packets++;
-    connections[i].cur_data_len_src += tcp->th_win;
-    connections[i].cur_total_data_len += tcp->th_win;
+    connections[i].cur_data_len_src += capture_len;
+    connections[i].cur_total_data_len += capture_len;
   }
+  if (tcp->th_win > connections[i].max_win_size){
+    connections[i].max_win_size = tcp->th_win;
+  }
+  if (tcp->th_win < connections[i].min_win_size){
+    connections[i].min_win_size = tcp->th_win;
+  }
+  connections[i].sum_win_size += tcp->th_win;
 
 
 }
