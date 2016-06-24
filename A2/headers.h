@@ -27,6 +27,15 @@ struct TCP_hdr {
   u_short th_urp;		/* urgent pointer */
 };
 
+struct rtt_info{
+  struct timeval starting_time;
+  struct timeval ending_time;
+  int seq;
+  int ack;
+  int fin_count;
+  int syn_count;
+};
+
 struct connection{
   char ip_src[MAX_STR_LEN];  /*source ip*/
   char ip_dst[MAX_STR_LEN];  /*destination ip*/
@@ -47,9 +56,7 @@ struct connection{
   uint16_t max_win_size;  /*max window size*/
   uint16_t min_win_size;  /*min window size*/
   double sum_win_size;
-  //struct round_trip rtt_ary_src[MAX_NUM_CONNECTION/4]; /*assume 1000*/
-  int rtt_ary_src_len;    /*the size of the rtt_ary_src array*/
-  //struct round_trip rtt_ary_dst[MAX_NUM_CONNECTION/4]; /*assume 1000*/
-  int rtt_ary_dst_len;    /*the size of the rtt_ary_dst array*/
+  struct rtt_info rtt_array[MAX_NUM_CONNECTION/4]; /*assume 1000*/
+  int rtt_array_len;    /*the size of the rtt_ary_src array*/
   int is_set;
 };

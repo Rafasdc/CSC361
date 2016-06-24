@@ -20,14 +20,21 @@ void print_complete();
 
 void parse_packet(const unsigned char *packet, struct timeval ts, unsigned int capture_len);
 void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, const char *payload,unsigned int capture_len);
+void calculate_rtt();
 
 struct connection connections[MAX_NUM_CONNECTION];
 int total_connections = 0;
 struct timeval first_time;
 int min_packets, mean_packets, max_packets = 0;
-int mean_window, max_window = 0;
+int mean_window, max_window, total_windows = 0;
 int min_window = -1;
 double min_duration, mean_duration, max_duration = 0;
+double min_rtt = -1;
+double max_rtt, mean_rtt = 0;
+int complete_tcp = 0;
+int reset_tcp = 0;
+int still_open = 0;
+int rtt_total = 0;
 
 int main(int argc, char **argv)
 {
@@ -44,7 +51,6 @@ int main(int argc, char **argv)
    char errbuf[PCAP_ERRBUF_SIZE];
    handle = pcap_open_offline(argv[1], errbuf);
 
-   //TODO filter out HTTP packets and other packets use only TCP
 
    if (handle == NULL) {
      fprintf(stderr,"Couldn't open pcap file %s: %s\n", argv[1], errbuf);
@@ -64,7 +70,7 @@ int main(int argc, char **argv)
   printf("___________________________\n");
   print_connections();
   print_general();
-
+  calculate_rtt();
   print_complete();
   return 0;
 }
@@ -74,7 +80,6 @@ void print_connections(){
   initial_time = first_time.tv_sec;
   double init_time = (double)initial_time;
   init_time += (1.0/1000000)*first_time.tv_usec;
-  printf("%f\n",init_time);
   printf("\nB) Connections' details\n\n");
   //while still connection info to print
   int i = 0;
@@ -102,7 +107,8 @@ void print_connections(){
     } else if (syn == 0 && fin == 2){
       printf("Status: S0F2\n");
     }
-    //if complete printf
+
+    if (connections[i].syn_count > 0 && connections[i].fin_count>0){
 
       time_t start_time = connections[i].starting_time.tv_sec;
       double startt = (double)start_time;
@@ -146,11 +152,10 @@ void print_connections(){
       } else if (connections[i].min_win_size < min_window){
         min_window = connections[i].min_win_size;
       }
-
+      total_windows += connections[i].num_total_packets;
       mean_window += connections[i].sum_win_size;
 
 
-    if (connections[i].syn_count > 0 && connections[i].fin_count>0){
       printf("Start Time: %f\n",startt);
       printf("End Time: %f\n",endt);
       printf("Duration: %f\n",duration);
@@ -168,9 +173,7 @@ void print_connections(){
 
 void print_general(){
   int i = 0;
-  int complete_tcp = 0;
-  int reset_tcp = 0;
-  int still_open = 0;
+
   for(;i< total_connections; i++){
     if(connections[i].rst_count>0){
       reset_tcp++;
@@ -191,16 +194,16 @@ void print_general(){
 void print_complete(){
   printf("D) Complete TCP connections\n");
   printf("Minimum time durations: %f\n",min_duration);
-  printf("Mean time durations: %f\n",mean_duration/total_connections);
+  printf("Mean time durations: %f\n",mean_duration/complete_tcp);
   printf("Maximum time durations: %f\n\n",max_duration);
-  printf("Minimum RTT values including both send/received:\n");
-  printf("Mean RTT values including both send/received: \n");
-  printf("Maximum RTT values including both send/received: \n\n");
+  printf("Minimum RTT values including both send/received: %f\n",min_rtt);
+  printf("Mean RTT values including both send/received: %f\n",mean_rtt/rtt_total);
+  printf("Maximum RTT values including both send/received: %f\n\n",max_rtt);
   printf("Minimum number of packets including both send/received: %d\n",min_packets);
-  printf("Mean number of packets including both send/received: %d\n", mean_packets/total_connections);
+  printf("Mean number of packets including both send/received: %d\n", mean_packets/complete_tcp);
   printf("Maximum number of packets including both send/received: %d\n\n",max_packets);
   printf("Minimum received window size including both send/received: %d\n", min_window);
-  printf("Mean received window size including both send/received: %d\n", mean_window/total_connections);
+  printf("Mean received window size including both send/received: %d\n", mean_window/total_windows);
   printf("Maximum received window size including both send/received: %d\n\n",max_window);
   printf("_____________________________________________\n");
 }
@@ -242,12 +245,13 @@ void parse_packet(const unsigned char *packet, struct timeval ts, unsigned int c
     return;
   }
 
+  capture_len -= TH_OFF(tcp)*4;
   //get the payload
   packet += TH_OFF(tcp)*4;
   payload = (u_char *)packet;
 
 
-  check_connection(ip,tcp,ts,payload,capture_len_original);
+  check_connection(ip,tcp,ts,payload,capture_len);
   //char *addr = inet_ntoa(ip->ip_src);
   //printf("src addr=%s dst addr = %s,src_port=%d dst_port=%d\n",addr,inet_ntoa(ip->ip_dst),ntohs(tcp->th_sport),ntohs(tcp->th_dport));
 
@@ -284,10 +288,11 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
       connections[total_connections].fin_count+=1;
     } else if (tcp->th_flags & TH_SYN){
       connections[total_connections].syn_count+=1;
+      connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].starting_time = ts;
+      connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].syn_count++;
     } else if (tcp->th_flags & TH_RST){
       connections[total_connections].rst_count+=1;
     }
-    //TODO add the rest of fields
     connections[total_connections].num_packet_src++;
     connections[total_connections].num_total_packets++;
     connections[total_connections].cur_data_len_src += capture_len;
@@ -321,6 +326,8 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
     connections[total_connections].fin_count+=1;
   } else if (tcp->th_flags & TH_SYN){
     connections[total_connections].syn_count+=1;
+    connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].starting_time = ts;
+    connections[total_connections].rtt_array[connections[total_connections].rtt_array_len].syn_count++;
   } else if (tcp->th_flags & TH_RST){
     connections[total_connections].rst_count+=1;
   }
@@ -339,12 +346,32 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
   if (tcp->th_flags & TH_FIN){
     //printf("in RST\n");
     connections[i].fin_count+=1;
+    connections[i].rtt_array[connections[i].rtt_array_len].starting_time = ts;
+    connections[i].rtt_array[connections[i].rtt_array_len].fin_count++;
+    connections[i].rtt_array[connections[i].rtt_array_len].ack = tcp->th_ack;
   } else if (tcp->th_flags & TH_SYN){
     //printf("in SYN\n");
     connections[i].syn_count+=1;
+    if (tcp->th_flags & TH_ACK){
+      connections[i].rtt_array[connections[i].rtt_array_len].ending_time = ts;
+      connections[i].rtt_array[connections[i].rtt_array_len].syn_count++;
+      connections[i].rtt_array_len++;
+    }
   } else if (tcp->th_flags & TH_RST){
     //printf("in RST\n");
     connections[i].rst_count+=1;
+  }
+
+  if (tcp->th_flags & TH_ACK){
+    if (connections[i].rtt_array[connections[i].rtt_array_len].ack == 0){
+      connections[i].rtt_array[connections[i].rtt_array_len].ack = tcp->th_ack;
+      connections[i].rtt_array[connections[i].rtt_array_len].starting_time = ts;
+    } else if (tcp->th_seq == connections[i].rtt_array[connections[i].rtt_array_len].ack){
+      //found the pair
+      connections[i].rtt_array[connections[i].rtt_array_len].ending_time = ts;
+      connections[i].rtt_array[connections[i].rtt_array_len].seq = tcp->th_seq;
+      connections[i].rtt_array_len++;
+    }
   }
   //update endtime everytime a match is found this will be useful later
   connections[i].ending_time = ts;
@@ -376,4 +403,39 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
 
 
 
+}
+void calculate_rtt(){
+  int i = 0;
+  int j = 0;
+  time_t initial_time;
+  initial_time = first_time.tv_sec;
+  double init_time = (double)initial_time;
+  init_time += (1.0/1000000)*first_time.tv_usec;
+  for (;i<total_connections;i++){
+    if (connections[i].syn_count > 0 && connections[i].fin_count > 0){
+      for (;j<connections[i].rtt_array_len;j++){
+        //calculate rtt for all connections and update min max and add them all to get mean
+        time_t start_time = connections[i].rtt_array[j].starting_time.tv_sec;
+        double startt = (double)start_time;
+        startt += (1.0/1000000)*connections[i].rtt_array[j].starting_time.tv_usec;
+        startt -= init_time;
+        time_t end_time = connections[i].rtt_array[j].ending_time.tv_sec;
+        double endt = (double)end_time;
+        endt +=(1.0/1000000)*connections[i].rtt_array[j].ending_time.tv_usec;
+        endt -= init_time;
+        double duration = endt-startt;
+        printf("%f\n", duration);
+        mean_rtt += duration;
+        rtt_total++;
+        if (duration > max_rtt){
+          max_rtt = duration;
+        }
+        if (min_rtt == -1){
+          min_rtt = duration;
+        } else if (duration < min_rtt) {
+          min_rtt = duration;
+        }
+      }
+    }
+  }
 }
