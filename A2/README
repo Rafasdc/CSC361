@@ -29,3 +29,11 @@ If a connection included a reset in it the status of the connections was
 reported only as R, even if the connection had other status aside from that, this is
 according to mentioned in chat that were the two options of handling the connections
 with both types of status, I decided to only print R as the status if it contained a reset.
+
+The calculated data displayed is calculated by subtraction of the respective info(IP Len etc) from the capture_len.
+The results match the expected results provided in lab session5.
+
+The Mean RTT that is displayed differs by the expected one by 0.02 I am not sure if this is a
+rounding error, or something extra that was calculated when the RTT pairs were matched, as I checked
+the RTT function which does the calculation of the times and that is working correctly.
+The min RTT and Max were correctly calculated by my function and match the expected values provided.

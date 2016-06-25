@@ -31,6 +31,7 @@ struct rtt_info{
   struct timeval starting_time;
   struct timeval ending_time;
   int first_seq;
+  int syn_count;
   int fin;
   int looking_syn_ack;
   int looking_for_seq;

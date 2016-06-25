@@ -64,11 +64,19 @@ int main(int argc, char **argv)
      return(2);
    }
 
+   struct bpf_program fp;
+   if (pcap_compile(handle, &fp, "tcp", 0, 0) == -1) {
+       fprintf(stderr, "Couldn't compile filter: %s\n", pcap_geterr(handle));
+       return(2);
+   }
+   if (pcap_setfilter(handle, &fp) == -1) {
+       fprintf(stderr, "Couldn't set filter: %s\n",pcap_geterr(handle));
+       return(2);
+   }
+
    total_connections = 0;
    while (packet = pcap_next(handle,&header)) {
      parse_packet(packet,header.ts,header.caplen);
-      packet_counter++;
-
     }
     pcap_close(handle);
 
@@ -280,7 +288,7 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
   int match = 0;
   //printf(" Win: %d\n", ntohs(tcp->th_win));
   if (total_connections == 0){
-    printf ("FIRST PACK IN CONN WITH: SEQ is %d and ACK is %d with conn= %d\n ", ntohs(tcp->th_seq), ntohs(tcp->th_ack),total_connections);
+    //printf ("FIRST PACK IN CONN WITH: SEQ is %d and ACK is %d with conn= %d\n ", ntohs(tcp->th_seq), ntohs(tcp->th_ack),total_connections);
     strcpy(connections[total_connections].ip_src, inet_ntoa(ip->ip_src));
     strcpy(connections[total_connections].ip_dst, inet_ntoa(ip->ip_dst));
     connections[total_connections].port_src = ntohs(tcp->th_sport);
@@ -348,29 +356,32 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
   connections[total_connections].max_win_size = ntohs(tcp->th_win);
   connections[total_connections].min_win_size = ntohs(tcp->th_win);
   connections[total_connections].sum_win_size += ntohs(tcp->th_win);
-  printf ("FIRST PACK IN CONN WITH: SEQ is %d and ACK is %d with conn= %d\n ", ntohs(tcp->th_seq), ntohs(tcp->th_ack),total_connections);
+  //printf ("FIRST PACK IN CONN WITH: SEQ is %d and ACK is %d with conn= %d\n ", ntohs(tcp->th_seq), ntohs(tcp->th_ack),total_connections);
   total_connections++;
 } else if (match == 1){
   //match is at i
   //we have a match and have to handle modify the connection to which packet matched
-  printf ("SEQ is %d and ACK is %d with i = %d\n ", ntohs(tcp->th_seq), ntohs(tcp->th_ack),i);
-  if (connections[i].rtt_array[connections[i].rtt_array_len].first == 1){
+  int first = connections[i].rtt_array[connections[i].rtt_array_len].first;
+  //if its the first package we are going to look for a match for RTT then we look for ack matching seq
+  if (first == 1){
     connections[i].rtt_array[connections[i].rtt_array_len].starting_time = ts;
     connections[i].rtt_array[connections[i].rtt_array_len].first = 0;
+    connections[i].rtt_array[connections[i].rtt_array_len].looking_for = ntohs(tcp->th_seq);
+    connections[i].rtt_array[connections[i].rtt_array_len].looking_for_ack = 1;
+    connections[i].rtt_array[connections[i].rtt_array_len].looking_for_seq = 0;
   }
   int connection_first_seq = connections[i].rtt_array[0].first_seq;
   if (tcp->th_flags & TH_FIN){
     connections[i].fin_count+=1;
     connections[i].rtt_array[connections[i].rtt_array_len].starting_time = ts;
     connections[i].rtt_array[connections[i].rtt_array_len].fin = 1;
-    //connections[i].rtt_array[connections[i].rtt_array_len].looking_for = ntohs(tcp->th_ack);
   } else if (tcp->th_flags & TH_SYN){
     //printf("in SYN\n");
     connections[i].syn_count+=1;
     if (tcp->th_flags & TH_ACK ){
       //printf("SYN and ACK\n");
+      //if SYN and ACK then we check for matching ack with seq, if there is then we found the first RTT
       if (connections[i].rtt_array[connections[i].rtt_array_len].looking_for == (ntohs(tcp->th_ack)) && connections[i].rtt_array[connections[i].rtt_array_len].looking_syn_ack == 1){
-        //printf("SYN and ACK\n");
         //printf("found matching ACK = %d with initial SEQ\n ",ntohs(tcp->th_ack));
           connections[i].rtt_array[connections[i].rtt_array_len].ending_time = ts;
           connections[i].rtt_array[connections[i].rtt_array_len].syn_count++;
@@ -389,6 +400,7 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
   }
 
   if (tcp->th_flags & TH_ACK){
+    //printf ("SEQ is %d and ACK is %d with i = %d\n ", ntohs(tcp->th_seq), ntohs(tcp->th_ack),i);
     if(connections[i].rtt_array[connections[i].rtt_array_len].looking_for_seq == 1){
       //printf("Looking for ACK %d found SEQ %d\n", connections[i].rtt_array[connections[i].rtt_array_len].ack,ntohs(tcp->th_seq));
       if (connections[i].rtt_array[connections[i].rtt_array_len].looking_for == ntohs(tcp->th_seq)){
@@ -397,9 +409,7 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
         connections[i].rtt_array_len++;
         connections[i].rtt_array[connections[i].rtt_array_len].looking_for = ntohs(tcp->th_seq);
         connections[i].rtt_array[connections[i].rtt_array_len].first = 1;
-        //printf("looking for %d in ACK\n",ntohs(tcp->th_seq));
-
-        connections[i].rtt_array[connections[i].rtt_array_len].looking_for_ack = 1;
+        connections[i].rtt_array[connections[i].rtt_array_len].looking_for_ack = 1; //reverse it (useful for first few RTT)
       }
     }else if (connections[i].rtt_array[connections[i].rtt_array_len].looking_for_ack == 1){
       //printf("Looking for SEQ %d found ACK %d\n", connections[i].rtt_array[connections[i].rtt_array_len].seq,ntohs(tcp->th_ack));
@@ -408,13 +418,12 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
         connections[i].rtt_array[connections[i].rtt_array_len].ending_time = ts;
         connections[i].rtt_array_len++;
         connections[i].rtt_array[connections[i].rtt_array_len].looking_for = ntohs(tcp->th_ack);
-        //printf("looking for %d in SEQ\n",ntohs(tcp->th_ack));
         connections[i].rtt_array[connections[i].rtt_array_len].first = 1;
-        connections[i].rtt_array[connections[i].rtt_array_len].looking_for_seq = 1;
+        connections[i].rtt_array[connections[i].rtt_array_len].looking_for_seq = 1; //reverse it (useful for first few RTT)
       }
     }
   }
-  //update endtime everytime a match is found this will be useful later
+  //update endtime everytime a match is found this will be useful later for duration and start end
   connections[i].ending_time = ts;
 
   //handle packets and data sent
@@ -453,6 +462,7 @@ void check_connection(struct ip *ip, struct TCP_hdr *tcp, struct timeval ts, con
   (3) Third RTT: the time when the next DATA/ACK is sent to the time when the next ACK/DATA is received.
   (you need to compare the seq number and the ack number to find the match).......
   The last RTT: the last match between FIN and ACK.
+  This is all done when finding connection pairs
 */
 void calculate_rtt(){
   int i = 0;
@@ -465,7 +475,6 @@ void calculate_rtt(){
     int j = 0;
     if (connections[i].syn_count > 0 && connections[i].fin_count>0){
       while(j<connections[i].rtt_array_len){
-        printf("%d\n",i);
         //calculate rtt for all connections and update min max and add them all to get mean
         time_t start_time = connections[i].rtt_array[j].starting_time.tv_sec;
         double startt = (double)start_time;
@@ -476,7 +485,7 @@ void calculate_rtt(){
         endt +=(1.0/1000000)*connections[i].rtt_array[j].ending_time.tv_usec;
         endt -= init_time;
         double duration = endt-startt;
-        printf("RTT %f from connection %d\n", duration, i);
+        //printf("%f\n", duration);
         mean_rtt += duration;
         rtt_total++;
         if (duration > max_rtt){
