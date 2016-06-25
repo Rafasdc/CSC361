@@ -31,12 +31,12 @@ struct rtt_info{
   struct timeval starting_time;
   struct timeval ending_time;
   int first_seq;
-  int seq;
-  int ack;
-  int fin_count;
-  int syn_count;
+  int fin;
   int looking_syn_ack;
-  int looking_match_seq;
+  int looking_for_seq;
+  int looking_for_ack;
+  int looking_for;
+  int first;
 };
 
 struct connection{
