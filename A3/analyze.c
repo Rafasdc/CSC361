@@ -7,6 +7,9 @@
 #include <netinet/ip.h>
 #include <net/if.h>
 #include <netinet/if_ether.h>
+#include <netinet/ip_icmp.h>
+#include <sys/cdefs.h>
+#include <sys/types.h>
 #include <arpa/inet.h>
 #include <time.h>
 
@@ -104,6 +107,72 @@ int parse_packet(const unsigned char *packet, unsigned int capture_len, struct r
   return 0;
 
 }
+
+in analyze_packet (struct ip *ip, const unsigned char*packet,struct router routers[MAX_HOPS],
+  int protocols[MAX_STR_LEN], struct timeval ts, struct outgoing times[MAX_HOPS]){
+
+  struct icmphdr *icmp;
+  struct udphdr *udp;
+  uint16_t port;
+  unsigned short temp,id,offset;
+  int mf;
+
+  //get ID of packet
+  temp = ip->ip_id;
+  id = (temp>>8)|(temp<<8);
+  //pakcet if ICMP
+  if(ip->ip_p == 1){
+    icmp = (struct icmphdr*) packet;
+    //add protocol
+    add_protocol(protocols,1);
+    //packet timed out
+    if(icmp->code == 11){
+      //add intermiediate router to list
+      add_to_list(routers,packet,ip,protocols,ts,times);
+    //first packet sent in trace route
+    } else if ((icmp->code == 8) && (ip->ip_ttl == 1) && (first_id == 0)){
+        //set source and ultimate destination address
+        ult_dst = ip->ip_dst.s_addr;
+        srt = ip->ip_src.s_addr;
+        //record time packet was sent
+        add_time(ip,id,ts,times);
+        //set ID of first packet
+        temp-> ip->ip_id;
+        first_id = (temp>>8)|(temp<<8);
+        //Get MF flag value
+        mf = (ip->ip_off & 0x0020) >> 5;
+        //if MF is set, incerement total number of fragments
+        if (mf == 1){
+          fragments++;
+        }
+      //packet is a fragment of the first packet sent in traceroute
+    } else if (first_id == id){
+          //Get MF flag value
+          mf = (ip->ip_off & 0x0020) >> 5;
+          //increment total number of fragments
+          fragments++;
+          //get offset value
+          temp = ip->ip_off & 0xFF1F;
+          offset = (temp>>8)|(temp<<8);
+          //calculate vaue of offset if there are no more fragments
+          if(mf == 0){
+            last_frag=offset*8;
+          }
+          //recor time packet was sent
+          add_time(ip,id,ts,times);
+      //packet is outgoing, record time sent
+    } else if (icmp->code == 8){
+          //record time packet was sent
+          add_time(ip,id,ts,times);
+      //packet signifies that the destination has been reached  
+    } else if (icmp->code ==0)||(icmp->code ==3){
+          add_to_list(routers,packet,ip,protocols,ts,times);
+          list_index--;
+          return 1;
+    }
+  }
+}
+
 
 
 
