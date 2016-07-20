@@ -116,6 +116,8 @@ in analyze_packet (struct ip *ip, const unsigned char*packet,struct router route
   uint16_t port;
   unsigned short temp,id,offset;
   int mf;
+  int ult_dst;
+  int fragments;
 
   //get ID of packet
   temp = ip->ip_id;
