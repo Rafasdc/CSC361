@@ -11,9 +11,7 @@
 #include <time.h>
 
 
-#define MAX_STR_LEN 100
-#define MAX_HOPS 1000
-
+#include "headers.h"
 
 
 //parses the packet
@@ -25,6 +23,8 @@ int parse_packet(const unsigned char *packet, unsigned int capture_len, struct r
 
 int main(int argc, char **argv)
 {
+
+  pcap_t *handle;
   char err_buff [PCAP_ERRBUF_SIZE];
   struct pcap_pkthdr header;
   const u_char *packet;
@@ -37,17 +37,15 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-   pcap_t *handle;
-   char errbuf[PCAP_ERRBUF_SIZE];
-   handle = pcap_open_offline(argv[1], errbuf);
+   handle = pcap_open_offline(argv[1], err_buff);
 
 
    if (handle == NULL) {
-     fprintf(stderr,"Couldn't open pcap file %s: %s\n", argv[1], errbuf);
+     fprintf(stderr,"Couldn't open pcap file %s: %s\n", argv[1], err_buff);
      return(2);
    }
 
-   total_connections = 0;
+   //total_connections = 0;
    while (packet = pcap_next(handle,&header)) {
      parse_packet(packet,header.caplen,routers,protocols,header.ts,times);
     }
