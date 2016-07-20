@@ -108,7 +108,7 @@ int parse_packet(const unsigned char *packet, unsigned int capture_len, struct r
 
 }
 
-in analyze_packet (struct ip *ip, const unsigned char*packet,struct router routers[MAX_HOPS],
+int analyze_packet (struct ip *ip, const unsigned char*packet,struct router routers[MAX_HOPS],
   int protocols[MAX_STR_LEN], struct timeval ts, struct outgoing times[MAX_HOPS]){
 
   struct icmphdr *icmp;
@@ -118,13 +118,17 @@ in analyze_packet (struct ip *ip, const unsigned char*packet,struct router route
   int mf;
   int ult_dst;
   int fragments;
+  int last_frag;
+  int list_index;
+  int src;
+  int first_id;
 
   //get ID of packet
   temp = ip->ip_id;
   id = (temp>>8)|(temp<<8);
   //pakcet if ICMP
   if(ip->ip_p == 1){
-    icmp = (struct icmphdr*) packet;
+    icmp = (struct icmphdr*) packet; 
     //add protocol
     add_protocol(protocols,1);
     //packet timed out
@@ -135,11 +139,11 @@ in analyze_packet (struct ip *ip, const unsigned char*packet,struct router route
     } else if ((icmp->code == 8) && (ip->ip_ttl == 1) && (first_id == 0)){
         //set source and ultimate destination address
         ult_dst = ip->ip_dst.s_addr;
-        srt = ip->ip_src.s_addr;
+        src = ip->ip_src.s_addr;
         //record time packet was sent
         add_time(ip,id,ts,times);
         //set ID of first packet
-        temp-> ip->ip_id;
+        temp= ip->ip_id;
         first_id = (temp>>8)|(temp<<8);
         //Get MF flag value
         mf = (ip->ip_off & 0x0020) >> 5;
@@ -167,7 +171,7 @@ in analyze_packet (struct ip *ip, const unsigned char*packet,struct router route
           //record time packet was sent
           add_time(ip,id,ts,times);
       //packet signifies that the destination has been reached  
-    } else if (icmp->code ==0)||(icmp->code ==3){
+    } else if ((icmp->code ==0)||(icmp->code ==3)){
           add_to_list(routers,packet,ip,protocols,ts,times);
           list_index--;
           return 1;
