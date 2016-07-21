@@ -8,8 +8,6 @@
 #include <net/if.h>
 #include <netinet/if_ether.h>
 #include <netinet/ip_icmp.h>
-#include <sys/cdefs.h>
-#include <sys/types.h>
 #include <arpa/inet.h>
 #include <time.h>
 
@@ -21,8 +19,16 @@
 int parse_packet(const unsigned char *packet, unsigned int capture_len, struct router routers[MAX_HOPS],
  int protocols [MAX_STR_LEN], struct timeval ts, struct outgoing times[MAX_HOPS]);
 
+void print_info();
+
 
 //global variable for easier printing and manipulation
+char ult_dst[MAX_STR_LEN];
+int fragments = 0;
+int last_frag;
+int list_index;
+int first_id;
+char src[MAX_STR_LEN];
 
 int main(int argc, char **argv)
 {
@@ -30,17 +36,21 @@ int main(int argc, char **argv)
   pcap_t *handle;
   char err_buff [PCAP_ERRBUF_SIZE];
   struct pcap_pkthdr header;
-  const u_char *packet;
-  struct router routers [MAX_HOPS];
-  struct outgoing times [MAX_HOPS];
+  const unsigned char *packet;
+
+  
+  
+  struct router routers[MAX_HOPS]; 
+  struct outgoing times[MAX_HOPS];
   int protocols [MAX_STR_LEN];
+
 
   if (argc < 2) {
     fprintf(stderr, "Usage: %s <pcap>\n", argv[0]);
     exit(1);
   }
 
-   handle = pcap_open_offline(argv[1], err_buff);
+  handle = pcap_open_offline(argv[1], err_buff);
 
 
    if (handle == NULL) {
@@ -49,17 +59,37 @@ int main(int argc, char **argv)
    }
 
    //total_connections = 0;
-   while (packet = pcap_next(handle,&header)) {
-     parse_packet(packet,header.caplen,routers,protocols,header.ts,times);
-    }
-    pcap_close(handle);
+   while ((packet = pcap_next(handle,&header)) != NULL) {
+     if (parse_packet(packet,header.caplen,routers,protocols,header.ts,times)){
+      //break;
+     }
+  }
+    //pcap_close(handle);
+
+    print_info();
 
 
   return 0;
 }
 
 
+void print_info(){
+  printf("The IP address of the source node: %s \n", src);
+  printf("The IP address of ultimate destination node: %s \n",ult_dst);
+  printf("The IP addresses of the intermediate destination nodes: \n");
+  int i=0;
+  //for(;i<routers.size; i++){
+  //  printf("router %d: \n",i);
+  //}
+  printf("The values in the protocol field of the IP headers:\n");
+  //have to add here
 
+  printf("The number of fragments created from the original datagram is: %d \n", fragments);
+  printf("The offset of the last frament is: \n");
+
+  //Average RTTs go here.
+  
+}
 
 
 
@@ -70,39 +100,33 @@ int parse_packet(const unsigned char *packet, unsigned int capture_len, struct r
   struct ip *ip; //ip header
   unsigned int IP_header_length; //ip header length
 
+
   //Skip over Ethernet header
   packet += sizeof(struct ether_header);
   capture_len -= sizeof(struct ether_header);
 
 
-  if (capture_len < sizeof(struct ip)){
-    printf("IP header too short");
-    return -1;
-  }
+
+
+
 
   //get ip header size and ip header
   ip = (struct ip*) packet;
   IP_header_length = ip->ip_hl * 4;
 
-  
-  //check ip header size
-  if (capture_len < IP_header_length){
-    printf("IP header with options too short");
-    return -1;
-  }
 
 
-
-  
-  //SKIP IP HEADER
+  //get to the TCP header
   packet += IP_header_length;
   capture_len -= IP_header_length;
 
-  /*
-  if (analyze_packet (ip,packet,routers,protocols,ts,times){
-    return 1;
-  })
-  */
+
+
+  
+  if (analyze_packet (ip,packet,routers,protocols,ts,times)){
+    //return 1;
+  }
+  
 
   return 0;
 
@@ -111,37 +135,39 @@ int parse_packet(const unsigned char *packet, unsigned int capture_len, struct r
 int analyze_packet (struct ip *ip, const unsigned char*packet,struct router routers[MAX_HOPS],
   int protocols[MAX_STR_LEN], struct timeval ts, struct outgoing times[MAX_HOPS]){
 
+  //printf("In analyze packet\n");
   struct icmphdr *icmp;
   struct udphdr *udp;
   uint16_t port;
   unsigned short temp,id,offset;
   int mf;
-  int ult_dst;
-  int fragments;
-  int last_frag;
-  int list_index;
-  int src;
-  int first_id;
+  //printf("ip->ip_p is %d \n",ip->ip_p);
 
   //get ID of packet
   temp = ip->ip_id;
   id = (temp>>8)|(temp<<8);
   //pakcet if ICMP
   if(ip->ip_p == 1){
+    //printf("Creating ICMP\n");
     icmp = (struct icmphdr*) packet; 
+    //printf("ICMP code is %d \n",icmp->type);
     //add protocol
-    add_protocol(protocols,1);
+    //add_protocol(protocols,1);
     //packet timed out
-    if(icmp->code == 11){
+      printf("ICMP type is %d \n", icmp->type);
+      //printf("ip->ttl is %d \n", ip->ip_ttl);
+      //printf("first_id is %d \n", first_id);
+    if(icmp->type == 11){
       //add intermiediate router to list
-      add_to_list(routers,packet,ip,protocols,ts,times);
+      //add_to_list(routers,packet,ip,protocols,ts,times);
     //first packet sent in trace route
-    } else if ((icmp->code == 8) && (ip->ip_ttl == 1) && (first_id == 0)){
+
+    } else if ((icmp->type == 8) && (ip->ip_ttl == 1) && (first_id == 0)){
         //set source and ultimate destination address
-        ult_dst = ip->ip_dst.s_addr;
-        src = ip->ip_src.s_addr;
+        strcpy(ult_dst,inet_ntoa(ip->ip_dst));
+        strcpy(src, inet_ntoa(ip->ip_src));
         //record time packet was sent
-        add_time(ip,id,ts,times);
+        //add_time(ip,id,ts,times);
         //set ID of first packet
         temp= ip->ip_id;
         first_id = (temp>>8)|(temp<<8);
@@ -165,17 +191,33 @@ int analyze_packet (struct ip *ip, const unsigned char*packet,struct router rout
             last_frag=offset*8;
           }
           //recor time packet was sent
-          add_time(ip,id,ts,times);
+          //add_time(ip,id,ts,times);
       //packet is outgoing, record time sent
-    } else if (icmp->code == 8){
+    } else if (icmp->type == 8){
           //record time packet was sent
-          add_time(ip,id,ts,times);
+          //add_time(ip,id,ts,times);
       //packet signifies that the destination has been reached  
-    } else if ((icmp->code ==0)||(icmp->code ==3)){
-          add_to_list(routers,packet,ip,protocols,ts,times);
+    } else if ((icmp->type ==0)||(icmp->type ==3)){
+          //add_to_list(routers,packet,ip,protocols,ts,times);
           list_index--;
-          return 1;
+          return 0;
     }
+  } else if (ip->ip_p == 17){
+    
+    if (first_id == 0 && ip->ip_ttl == 1){
+      //first_id = 
+      strcpy(ult_dst,inet_ntoa(ip->ip_dst));
+      strcpy(src, inet_ntoa(ip->ip_src));
+      //set ID of first packet
+        temp= ip->ip_id;
+        first_id = (temp>>8)|(temp<<8);      
+    }
+    
+    return 0;
+  } else if (ip->ip_p == 6){
+    return 0;
+  } else {
+    return 0;
   }
 }
 
