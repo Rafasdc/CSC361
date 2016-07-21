@@ -8,6 +8,7 @@
 #include <net/if.h>
 #include <netinet/if_ether.h>
 #include <netinet/ip_icmp.h>
+#include <netinet/udp.h>
 #include <arpa/inet.h>
 #include <time.h>
 
@@ -81,7 +82,7 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
   int n = sizeof(routers)/sizeof(routers[0]);
   printf("%d\n", n);
   for(; i< 39; i++){;
-    printf("  router %d: %s \n",i, routers[i].src_addr);
+    printf("  router %d with dest port %d : %s \n",i, routers[i].port_src, routers[i].src_addr);
   }
   printf("\nThe values in the protocol field of the IP headers:\n");
 
@@ -89,7 +90,7 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
   int j = 0;
   for(; j < MAX_PROTOCOLS; j++){
     if (protocols[j] == 1){
-      printf("%d\n", j);
+      printf("%d \n", j);
     }
   }
 
@@ -97,7 +98,7 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
   printf("The offset of the last frament is: %d \n", last_frag);
 
   //Average RTTs go here.
-  printf("The avg RTT between and is: ms, the s.d is: ms");
+  printf("The avg RTT between and is: ms, the s.d is: ms \n");
   
 }
 
@@ -134,11 +135,11 @@ int parse_packet(const unsigned char *packet, unsigned int capture_len, struct r
 
   
   if (analyze_packet (ip,packet,routers,protocols,ts,times)){
-    //return 1;
+    return 0;
   }
   
 
-  return 0; 
+  return 1; 
 
 }
 
@@ -149,8 +150,14 @@ void add_time(struct ip *ip, int id, struct timeval ts,struct outgoing times[MAX
 }
 
 void add_to_list(struct router routers[MAX_HOPS],const unsigned char*packet, struct ip *ip, int protocols[MAX_HOPS], struct timeval ts,struct outgoing times[MAX_HOPS]){
+      struct udphdr *udp;
+      udp = (struct udphdr*)packet;
+      //printf("%d\n", ntohs(udp->uh_dport));
+
       routers[list_index].packet = packet;
       strcpy(routers[list_index].src_addr ,inet_ntoa(ip->ip_src));
+      routers[list_index].port_src =  ntohs(udp->uh_sport);
+      routers[list_index].port_dst =  ntohs(udp->uh_dport);
       //routers[list_index].protocols = *protocols;
       routers[list_index].time_sent = ts;
       routers[list_index].times = times;
@@ -174,18 +181,24 @@ int analyze_packet (struct ip *ip, const unsigned char*packet,struct router rout
   if(ip->ip_p == 1){
     //printf("Creating ICMP\n");
     icmp = (struct icmphdr*) packet; 
-    printf("ICMP type is %d \n",icmp->type);
+    //printf("ICMP type is %d \n",icmp->type);
+    mf = (ip->ip_off & 0x0020) >> 5;
+    //printf(" MF flag is %d\n",mf );
     //add protocol
     protocols[1] = 1;
+
     //packet timed out
       //printf("ICMP type is %d \n", icmp->type);
     if(icmp->type == 11){
       //add intermiediate router to list
         //printf("%s\n", inet_ntoa(ip->ip_src));
+
         add_to_list(routers,packet,ip,protocols,ts,times);
         list_index++;
-    //first packet sent in trace route 
 
+
+
+    //first packet sent in trace route 
     } else if ((icmp->type == 8) && (ip->ip_ttl == 1) && (first_id == 0)){
         //set source and ultimate destination address
         strcpy(ult_dst,inet_ntoa(ip->ip_dst));
@@ -243,15 +256,21 @@ int analyze_packet (struct ip *ip, const unsigned char*packet,struct router rout
           fragments++;
         }     
     }
-    protocols[17] = 1;
+    //printf("First ID is %d and id is %d \n", first_id, id);
+    mf = (ip->ip_off & 0x0020) >> 5;
+    //printf(" MF flag is %d\n",mf );
     
-    return 0;
+    protocols[17] = 1;
+                udp = (struct udphdr*)packet;
+        printf("%d\n", ntohs(udp->uh_dport));
+    
+    return 1;
   } else if (ip->ip_p == 6){
     protocols[6] = 1;
-    return 0;
+    return 1;
   } else {
     protocols[ip->ip_p] == 1;
-    return 0;
+    return 1;
   }
 }
 
