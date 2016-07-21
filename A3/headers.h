@@ -2,6 +2,7 @@
 
 #define MAX_STR_LEN 100
 #define MAX_HOPS 1000
+#define MAX_PROTOCOLS 30
 
 
 /* TCP Header */
@@ -27,15 +28,35 @@ struct TCP_hdr {
   u_short th_urp;		/* urgent pointer */
 };
 
-struct router {
-  int ttl;
-  char ip_src[MAX_STR_LEN];
-  char ip_dst[MAX_STR_LEN];
-};
-
 struct outgoing {
-  struct timeval starting_time;
-  struct timeval ending_time;
+  struct ip *ip;
+  int id;
+  struct timeval time_sent;
+};
+
+struct router {
+  const unsigned char*packet;
+  char src_addr[MAX_STR_LEN];
+  int protocols[MAX_HOPS]; 
+  struct timeval time_sent;
+  struct outgoing *times;
 };
 
 
+
+/*
+void add_to_list(routers,const unsigned char*packet, struct ip *ip, int protocol, struct timeval ts,struct outgoing times[MAX_HOPS]){
+  routers[list_index].packet = packet;
+  routers[list_index].ip = packet;
+  routers[list_index].protocol = protocol;
+  routers[list_index].time_sent = ts;
+  routers[list_index].times = times;
+}
+
+
+        routers[list_index].packet = packet;
+        routers[list_index].ip = ip;
+        routers[list_index].protocol = *protocols;
+        routers[list_index].time_sent = ts;
+        routers[list_index].times = times;
+*/
