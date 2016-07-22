@@ -54,8 +54,13 @@ struct RTT {
   char dst_addr[MAX_STR_LEN];
   double time;
   double total_hops;
-  double sd[MAX_STR_LEN];
+  double times[MAX_HOPS];
 };
+
+struct mean_sd{
+  double mean;
+  double sd;
+}
 
 
 
