@@ -42,6 +42,9 @@ struct router {
   int protocols[MAX_HOPS];
   struct timeval time_sent;
   struct outgoing *times;
+  int fragments;
+  int id;
+  int offset;
 };
 
 
