@@ -44,6 +44,15 @@ struct router {
   struct outgoing *times;
 };
 
+struct router_ordered {
+  struct router router;
+};
+
+struct RTT {
+  char src_addr[MAX_STR_LEN];
+  char dst_addr[MAX_STR_LEN];
+};
+
 
 
 /*
