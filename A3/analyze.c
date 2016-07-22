@@ -12,7 +12,7 @@
 #include <arpa/inet.h>
 #include <time.h>
 
-
+#include "math.h"
 #include "headers.h"
 
 
@@ -233,17 +233,19 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
     if (RTTs[j].src_addr != NULL && RTTs[j].src_addr[0] != '\0'){
 
       if (j == 0){
+        //printf("IN here\n");
         RTTs[j].times[time_pos] = RTTs[j].time;
-        RTTs[j].total_hops++;
+        //RTTs[j].total_hops += 1;
         RTTs[j].to_print = 1;
         dst_pos = j;
         time_pos++;
-        continue;
-      }
-      printf("Comparing %s with %s \n", RTTs[dst_pos].dst_addr, RTTs[j].dst_addr);
+        
+      } else {
+      //printf("Comparing %s with %s \n", RTTs[dst_pos].dst_addr, RTTs[j].dst_addr);
       comp = strcmp(RTTs[dst_pos].dst_addr, RTTs[j].dst_addr);
-      printf("Comp is %d\n",comp);
+      //printf("Comp is %d\n",comp);
       if (comp != 0){
+        //printf("Adding a to newly found ip with addr %s\n", RTTs[j].dst_addr);
         //different
         dst_pos = j;
         time_pos = 0;
@@ -253,10 +255,12 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
         RTTs[j].total_hops++;
       } else if (comp == 0){
         RTTs[dst_pos].times[time_pos]= RTTs[j].time;
+        //printf("time pos is %d\n",time_pos);
         time_pos++;
-        RTTs[dst_pos].total_hops++;
-        printf("Total hops %d\n",RTTs[dst_pos].total_hops++);
+        RTTs[dst_pos].total_hops = time_pos;
+        //printf("Total hops %d\n",RTTs[dst_pos].total_hops++);
 
+      }
       }
     }
 
@@ -276,15 +280,41 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
   for (;i<MAX_STR_LEN; i++){
     if(RTTs[i].to_print == 1){
       int a = 0;
-      int mean = 0;
+      double mean = 0;
+      double mean_for_sd = 0;
+      double sum_u_mean = 0;
+      double sd = 0;
+      double x = 0;
+      double x_mean = 0;
+      double x_mean_2 = 0;
       int t_hops = RTTs[i].total_hops;
-      printf("Total hops %d\n", t_hops);
+      //printf("Total hops %d\n", t_hops);
       for(;a<t_hops;a++){
-        printf("%d %f\n",a,RTTs[a].times[a]);
-        mean += RTTs[a].times[a];
+        //printf("%d %f\n",a,RTTs[i].times[a]);
+        mean += RTTs[i].times[a];
       }
       RTTs[i].mean = mean/t_hops;
-      printf("The avg RTT between %s and %s  is: %f ms, the s.d is: ms \n",RTTs[i].src_addr,RTTs[i].dst_addr,RTTs[i].mean);
+      mean_for_sd = mean/t_hops;
+      mean_for_sd *= 1000;
+      //printf(" mean is %f \n", mean);
+      int b = 0;
+      for(;b<t_hops;b++){
+        //printf("%d %f\n",a,RTTs[i].times[a]);
+        x = RTTs[i].times[b]*1000;
+        //printf("x is %f\n", x);
+        x_mean = x-mean_for_sd;
+        //printf("x - mean is %f\n", x_mean);
+        x_mean_2 = (x_mean)*(x_mean);
+        //printf("x_mean_2 is %f \n", x_mean_2);
+
+        sum_u_mean += x_mean_2;
+      }
+      //printf("sum mean is %f \n", sum_u_mean);
+      sd = sqrt(sum_u_mean/t_hops);
+      //printf("sd is %f \n", sd);
+      RTTs[i].sd = sd;
+      
+      printf("The avg RTT between %s and %s  is: %f ms, the s.d is: %f ms \n",RTTs[i].src_addr,RTTs[i].dst_addr,RTTs[i].mean*1000, RTTs[i].sd);
     }
   }
 

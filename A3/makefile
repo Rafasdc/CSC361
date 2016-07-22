@@ -4,4 +4,4 @@ all: analyze
 
 # compile analyzer only
 analyze: analyze.c
-	gcc analyze.c -o analyze -lpcap
+	gcc analyze.c -o analyze -lpcap -lm
