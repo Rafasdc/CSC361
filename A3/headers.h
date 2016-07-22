@@ -51,6 +51,7 @@ struct router_ordered {
 struct RTT {
   char src_addr[MAX_STR_LEN];
   char dst_addr[MAX_STR_LEN];
+  double time; 
 };
 
 
