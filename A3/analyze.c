@@ -226,9 +226,38 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
   */
 
   j=0;
+  int time_pos = 0;
+  int dst_pos = 0;
+  int comp = 0;
   for(;j<MAX_STR_LEN; j++){
     if (RTTs[j].src_addr != NULL && RTTs[j].src_addr[0] != '\0'){
-      //printf("Time between %s and %s is %f\n", RTTs[j].src_addr,RTTs[j].dst_addr,RTTs[j].time);
+
+      if (j == 0){
+        RTTs[j].times[time_pos] = RTTs[j].time;
+        RTTs[j].total_hops++;
+        RTTs[j].to_print = 1;
+        dst_pos = j;
+        time_pos++;
+        continue;
+      }
+      printf("Comparing %s with %s \n", RTTs[dst_pos].dst_addr, RTTs[j].dst_addr);
+      comp = strcmp(RTTs[dst_pos].dst_addr, RTTs[j].dst_addr);
+      printf("Comp is %d\n",comp);
+      if (comp != 0){
+        //different
+        dst_pos = j;
+        time_pos = 0;
+        RTTs[j].to_print = 1;
+        RTTs[j].times[time_pos] = RTTs[j].time;
+        time_pos++;
+        RTTs[j].total_hops++;
+      } else if (comp == 0){
+        RTTs[dst_pos].times[time_pos]= RTTs[j].time;
+        time_pos++;
+        RTTs[dst_pos].total_hops++;
+        printf("Total hops %d\n",RTTs[dst_pos].total_hops++);
+
+      }
     }
 
   }
@@ -243,9 +272,22 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
 
 
 
+  i=0;
+  for (;i<MAX_STR_LEN; i++){
+    if(RTTs[i].to_print == 1){
+      int a = 0;
+      int mean = 0;
+      int t_hops = RTTs[i].total_hops;
+      printf("Total hops %d\n", t_hops);
+      for(;a<t_hops;a++){
+        printf("%d %f\n",a,RTTs[a].times[a]);
+        mean += RTTs[a].times[a];
+      }
+      RTTs[i].mean = mean/t_hops;
+      printf("The avg RTT between %s and %s  is: %f ms, the s.d is: ms \n",RTTs[i].src_addr,RTTs[i].dst_addr,RTTs[i].mean);
+    }
+  }
 
-  //Average RTTs go here.
-  printf("The avg RTT between and is: ms, the s.d is: ms \n");
 
 }
 

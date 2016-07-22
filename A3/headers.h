@@ -52,15 +52,14 @@ struct router_ordered {
 struct RTT {
   char src_addr[MAX_STR_LEN];
   char dst_addr[MAX_STR_LEN];
+  int to_print;
   double time;
-  double total_hops;
+  int total_hops;
   double times[MAX_HOPS];
-};
-
-struct mean_sd{
   double mean;
   double sd;
-}
+};
+
 
 
 
