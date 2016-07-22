@@ -39,10 +39,11 @@ struct router {
   char src_addr[MAX_STR_LEN];
   uint16_t port_src;
   uint16_t port_dst;
-  int protocols[MAX_HOPS]; 
+  int protocols[MAX_HOPS];
   struct timeval time_sent;
   struct outgoing *times;
 };
+
 
 struct router_ordered {
   struct router router;
@@ -51,8 +52,12 @@ struct router_ordered {
 struct RTT {
   char src_addr[MAX_STR_LEN];
   char dst_addr[MAX_STR_LEN];
-  double time; 
+  double time;
+  double total_hops;
+  double sd[MAX_STR_LEN];
 };
+
+
 
 
 

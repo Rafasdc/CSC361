@@ -28,9 +28,12 @@ char ult_dst[MAX_STR_LEN];
 int fragments = 0;
 int last_frag;
 int list_index = 0;
+int list_index_udp = 0;
 int first_id;
+int echo;
 char src[MAX_STR_LEN];
 struct RTT RTTs[MAX_STR_LEN];
+struct router udps[MAX_HOPS];
 
 int main(int argc, char **argv)
 {
@@ -40,9 +43,10 @@ int main(int argc, char **argv)
   struct pcap_pkthdr header;
   const unsigned char *packet;
 
-  
-  
-  struct router routers[MAX_HOPS]; 
+
+
+  struct router routers[MAX_HOPS];
+
   struct outgoing times[MAX_HOPS];
   int protocols [MAX_PROTOCOLS];
 
@@ -82,38 +86,49 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
   struct router routers_ordered[MAX_STR_LEN];
   int i=0;
   for(; i< list_index+1; i++){
-    if (routers[i].port_dst != 0){
+    //33434 || udp->uh_dport <= 33534
+    if (routers[i].port_dst != 0 && (routers[i].port_dst >= 33434 && routers[i].port_dst <= 33534)  ){
       routers_ordered[routers[i].port_dst - 33434] = routers[i];
     }
     //printf("%d\n", routers[i].port_dst - 33434);
     //printf("  router %d with dest port %d : %s \n",i, routers[i].port_dst, routers[i].src_addr);
   }
 
-  i=0;
-  char *intermediate_routers_ip[MAX_STR_LEN];
-  for(; i < list_index+1; i++){
-    //printf("%d\n", i);
-    int compare;
-    int pos;
-    if (routers_ordered[i].port_dst == 0){
-      continue;
+  if (echo == 1){
+    i = 0;
+    for(; i < list_index+1; i++){
+      //printf("%d\n", 1);
+      routers_ordered[i] = routers[i];
     }
-    if (i == 0){
-      intermediate_routers_ip[i] = routers_ordered[i].src_addr;
-      pos = i;
-      continue;
-    }
-    if (intermediate_routers_ip[pos] != NULL){
-        //printf("Comparing %s with %s \n", intermediate_routers_ip[pos],routers_ordered[i].src_addr );
-       compare = strcmp(intermediate_routers_ip[pos],routers_ordered[i].src_addr);
-       //printf("Compare is %d\n", compare);
-    } 
-    if(compare != 0){
-      intermediate_routers_ip[pos+1] = routers_ordered[i].src_addr;
-      pos++;
-    }   
   }
+  //printf("after echo \n");
+    i=0;
+    char *intermediate_routers_ip[MAX_STR_LEN];
+    for(; i < list_index+1; i++){
+      //printf("%d\n", i);
+      int compare;
+      int pos;
+      if (routers_ordered[i].port_dst == 0){
+        continue;
+      }
+      if (i == 0){
+        intermediate_routers_ip[i] = routers_ordered[i].src_addr;
+        pos = i;
+        continue;
+      }
+      if (intermediate_routers_ip[pos] != NULL){
+          //printf("Comparing %s with %s \n", intermediate_routers_ip[pos],routers_ordered[i].src_addr );
+         compare = strcmp(intermediate_routers_ip[pos],routers_ordered[i].src_addr);
+         //printf("Compare is %d\n", compare);
+      }
+      if(compare != 0){
+        intermediate_routers_ip[pos+1] = routers_ordered[i].src_addr;
+        pos++;
+      }
 
+
+
+  }
   i=0;
   for(; i < (sizeof(intermediate_routers_ip)/sizeof(intermediate_routers_ip[0])); i++){
     if (intermediate_routers_ip[i] != NULL){
@@ -140,7 +155,7 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
       } else {
         printf("%d\n", j);
       }
-    }  
+    }
   }
 
   printf("\nThe number of fragments created from the original datagram is: %d \n", fragments);
@@ -158,23 +173,34 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
         endt -= init_time;
         double duration = endt-startt;
         */
-  time_t start_time = times[0].time_sent.tv_sec; //time of first packet
-  double startt = (double)start_time;
+  //time_t start_time = times[0].time_sent.tv_sec; //time of first packet
+  //double startt = (double)start_time;
   //printf("%f\n",startt);
-  startt +=  (1.0/1000000)*times[0].time_sent.tv_usec;  
+  //startt +=  (1.0/1000000)*times[0].time_sent.tv_usec;
   j = 0;
   for(; j <  MAX_STR_LEN; j++){
-    if (routers_ordered[j].port_dst == 0){
+    if (routers_ordered[j].port_dst == 0 && echo == 0){
       continue;
     }
-    strcpy(RTTs[j].src_addr,ult_dst);
-    strcpy(RTTs[j].dst_addr, routers_ordered[j].src_addr);
-    time_t end_time = routers_ordered[j].time_sent.tv_sec;
-    double endt = (double)end_time;
-    endt += (1.0/1000000)*routers_ordered[j].time_sent.tv_usec;
-    //printf("%f\n",endt);
-    double duration = endt-startt;
-    RTTs[j].time = duration;
+    //printf("udp src port is  %d and icmp src port is %d \n", udps[j].port_src, routers_ordered[j].port_src );
+    if (udps[j].port_src == routers_ordered[j].port_src){
+
+      strcpy(RTTs[j].src_addr,ult_dst);
+      strcpy(RTTs[j].dst_addr, routers_ordered[j].src_addr);
+
+      time_t start_time = udps[j].time_sent.tv_sec; //time of first packet
+      double startt = (double)start_time;
+      startt +=  (1.0/1000000)*udps[j].time_sent.tv_usec;
+
+
+      time_t end_time = routers_ordered[j].time_sent.tv_sec;
+      double endt = (double)end_time;
+      endt += (1.0/1000000)*routers_ordered[j].time_sent.tv_usec;
+
+      //printf("%f\n",endt);
+      double duration = endt-startt;
+      RTTs[j].time = duration;
+    }
 
   }
 
@@ -183,8 +209,10 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
     if (RTTs[j].time != 0){
       printf("%f\n", RTTs[j].time);
     }
-    
+
   }
+
+
 
 
 
@@ -197,7 +225,7 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
 
   //Average RTTs go here.
   printf("The avg RTT between and is: ms, the s.d is: ms \n");
-  
+
 }
 
 
@@ -205,7 +233,7 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
 
 int parse_packet(const unsigned char *packet, unsigned int capture_len, struct router routers[MAX_HOPS],
  int protocols [MAX_STR_LEN], struct timeval ts, struct outgoing times[MAX_HOPS]){
-  
+
   struct ip *ip; //ip header
   unsigned int IP_header_length; //ip header length
 
@@ -231,13 +259,13 @@ int parse_packet(const unsigned char *packet, unsigned int capture_len, struct r
 
 
 
-  
+
   if (analyze_packet (ip,packet,routers,protocols,ts,times)){
     return 0;
   }
-  
 
-  return 1; 
+
+  return 1;
 
 }
 
@@ -248,8 +276,8 @@ void add_time(struct ip *ip, int id, struct timeval ts,struct outgoing times[MAX
 }
 
 void add_to_list(struct router routers[MAX_HOPS],const unsigned char*packet, struct ip *ip, int protocols[MAX_HOPS], struct timeval ts,struct outgoing times[MAX_HOPS]){
-      
-      packet+=28; //8 bytes ICMP, 20 bytes IP 
+
+      packet+=28; //8 bytes ICMP, 20 bytes IP
       struct udphdr *udp;
       udp = (struct udphdr*)packet;
       //printf("%d\n", ntohs(udp->uh_dport));
@@ -261,6 +289,25 @@ void add_to_list(struct router routers[MAX_HOPS],const unsigned char*packet, str
       //routers[list_index].protocols = *protocols;
       routers[list_index].time_sent = ts;
       routers[list_index].times = times;
+}
+
+void add_to_list_udp(struct udphdr *udp, struct ip *ip, int protocols[MAX_HOPS], struct timeval ts,struct outgoing times[MAX_HOPS]){
+
+
+
+      //packet+=28; //8 bytes ICMP, 20 bytes IP
+      //struct udphdr *udp;
+      //udp = (struct udphdr*)packet;
+      //printf("%d\n", ntohs(udp->uh_dport));
+
+      //udps[list_index].packet = packet;
+      strcpy(udps[list_index_udp].src_addr ,inet_ntoa(ip->ip_src));
+      udps[list_index_udp].port_src =  ntohs(udp->uh_sport);
+      udps[list_index_udp].port_dst =  ntohs(udp->uh_dport);
+
+      //udps[list_index_udp].protocols = *protocols;
+      udps[list_index_udp].time_sent = ts;
+      udps[list_index_udp].times = times;
 }
 
 int analyze_packet (struct ip *ip, const unsigned char*packet,struct router routers[MAX_HOPS],
@@ -280,7 +327,7 @@ int analyze_packet (struct ip *ip, const unsigned char*packet,struct router rout
   //pakcet if ICMP
   if(ip->ip_p == 1){
     //printf("Creating ICMP\n");
-    icmp = (struct icmphdr*) packet; 
+    icmp = (struct icmphdr*) packet;
     //printf("ICMP type is %d \n",icmp->type);
 
     mf = (ip->ip_off & 0x0020) >> 5;
@@ -301,8 +348,10 @@ int analyze_packet (struct ip *ip, const unsigned char*packet,struct router rout
 
 
 
-    //first packet sent in trace route 
+    //first packet sent in trace route
     } else if ((icmp->type == 8) && (ip->ip_ttl == 1) && (first_id == 0)){
+      //printf("IN here\n" );
+      echo = 1;
         //set source and ultimate destination address
         strcpy(ult_dst,inet_ntoa(ip->ip_dst));
         strcpy(src, inet_ntoa(ip->ip_src));
@@ -336,7 +385,7 @@ int analyze_packet (struct ip *ip, const unsigned char*packet,struct router rout
     } else if (icmp->type == 8){
           //record time packet was sent
           add_time(ip,id,ts,times);
-    //packet signifies that the destination has been reached  
+    //packet signifies that the destination has been reached
     } else if ((icmp->type ==0)||(icmp->type ==3)){
           add_to_list(routers,packet,ip,protocols,ts,times);
           //list_index--;
@@ -347,39 +396,49 @@ int analyze_packet (struct ip *ip, const unsigned char*packet,struct router rout
     struct udphdr *udp;
     udp = (struct udphdr*)packet;
 
-    
-    if (first_id == 0 && ip->ip_ttl == 1 && (udp->uh_dport >= 33434 || udp->uh_dport <= 33534)){
-      //first_id = 
-      strcpy(ult_dst,inet_ntoa(ip->ip_dst));
-      strcpy(src, inet_ntoa(ip->ip_src));
-      add_time(ip,id,ts,times);
-      //set ID of first packet
-       temp= ip->ip_id;
-       first_id = (temp>>8)|(temp<<8);
-       //Get MF flag value
-       mf = (ip->ip_off & 0x0020) >> 5;
-       //if MF is set, incerement total number of fragments
-       if (mf == 1){
-          fragments++;
-        }     
+   //printf("%d\n",ntohs(udp->uh_dport) >= 33434 && ntohs(udp->uh_dport));
+
+    if ((ntohs(udp->uh_dport) >= 33434 && ntohs(udp->uh_dport) <= 33534)){
+      if (first_id == 0 && ip->ip_ttl == 1 ){
+        //first_id =
+        strcpy(ult_dst,inet_ntoa(ip->ip_dst));
+        strcpy(src, inet_ntoa(ip->ip_src));
+        add_time(ip,id,ts,times);
+        //set ID of first packet
+         temp= ip->ip_id;
+         first_id = (temp>>8)|(temp<<8);
+         //Get MF flag value
+         mf = (ip->ip_off & 0x0020) >> 5;
+         //if MF is set, incerement total number of fragments
+         if (mf == 1){
+            fragments++;
+          }
+      }
+      //printf("%d\n", ntohs(udp->uh_dport));
+      //printf("%d\n", ntohs(udp->uh_sport));
+      add_to_list_udp(udp,ip,protocols,ts,times);
+      list_index_udp++;
+
+
     }
     //printf("First ID is %d and id is %d \n", first_id, id);
-    mf = (ip->ip_off & 0x0020) >> 5;
+
     //printf(" MF flag is %d\n",mf );
-    
+
     protocols[17] = 1;
         //udp = (struct udphdr*)packet;
-       //printf("%d\n", ntohs(udp->uh_dport));
-        //printf("%d\n", ntohs(udp->uh_sport));
-    
+
+
     return 1;
   } else if (ip->ip_p == 6){
     protocols[6] = 1;
     return 1;
   } else {
-    protocols[ip->ip_p] == 1;
+    if (ip->ip_p < 31){
+      protocols[ip->ip_p] == 1;
+    }
     return 1;
   }
+  //printf("In here\n");
+  return 1;
 }
-
-
