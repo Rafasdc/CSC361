@@ -1,0 +1,50 @@
+Rafael Solorzano
+V00838235
+CSC361 Summer 2016 Assignment 2
+
+-----------------------------------------------------------------------------
+Requirement 2 in Attached PDF
+------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+
+TO COMPILE
+
+run make
+
+------------------------------------------------------------------------------
+
+TO USE
+
+./analyze <capture file to analyze>
+
+example:
+
+./analyze trace1.pcapng
+
+This will produce the output as required according to the specifications
+provided in Assignment 3 Document.
+
+Sample from Trace1:
+
+The IP address of the source node: 192.168.100.17
+The IP address of ultimate destination node: 8.8.8.8
+The IP addresses of the intermediate destination nodes:
+  router 1 : 142.104.68.167
+  router 2 : 142.104.68.1
+  router 3 : 192.168.9.5
+.....
+.... (Rest of data)
+
+
+-------------------------------------------------------------------------------
+
+INFO
+
+The applicaiton supports windows and linux style trace files and will produce the corresponding information
+of them accordingly. Additionally fragmentation is supported from linux style trace files, as no test
+of fragmented windows style trace files were provided this is not supported.
+
+The assignment was tested in Lab using N-Delta computer, and it compiled and worked without problem.
+
+The fragments are calculated, by matching ID and checking MF flags, as show during lab period.

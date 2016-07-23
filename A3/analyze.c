@@ -348,9 +348,11 @@ struct fragment fragment_list[MAX_HOPS];
     }
   }
   if (echo == 0 && fragments != 0){
+    int c = 0;
     for (i=0; i<fragment_index;i++){
       if (fragment_list[i].count != 0 && fragment_list[i].offset > 0){
-        printf("\nThe number of fragments created from the original datagram is: %d \n", fragment_list[i].count);
+        c++;
+        printf("\nThe number of fragments created from the original datagram D%d is: %d \n", c, fragment_list[i].count);
         printf("The offset of the last fragment is: %d \n", fragment_list[i].offset*8);
       }
     }
@@ -672,12 +674,12 @@ int analyze_packet (struct ip *ip, const unsigned char*packet,struct router rout
     //printf("id is %d\n",id);
     temp = ip->ip_off & 0xFF1F;
     offset = (temp>>8)|(temp<<8);
-    printf("id is %d with offset is %d \n", id, offset);
+    //printf("id is %d with offset is %d \n", id, offset);
     mf = (ip->ip_off & 0x0020) >> 5;
 
     fragments_to_match[fragment_index].id = id;
     fragments_to_match[fragment_index].offset = offset;
-    printf("OFFSET OFFSET OFFSET %d\n",fragments_to_match[fragment_index].offset = offset);
+    //printf("OFFSET OFFSET OFFSET %d\n",fragments_to_match[fragment_index].offset = offset);
     fragments_to_match[fragment_index].mf = mf;
     //printf("MF MF MF MF MF MF MF %d\n", fragments_to_match[fragment_index].mf);
     fragment_index++;
