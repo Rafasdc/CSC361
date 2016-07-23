@@ -37,6 +37,7 @@ struct outgoing {
 struct router {
   const unsigned char*packet;
   char src_addr[MAX_STR_LEN];
+  char dst_addr[MAX_STR_LEN];
   uint16_t port_src;
   uint16_t port_dst;
   int protocols[MAX_HOPS];

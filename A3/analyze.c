@@ -223,7 +223,7 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
       }
     } else if(echo == 1){
       if(routers_ordered[j].ttl < 20 && routers_ordered[j].ttl != 0){
-        printf("TLL is %d \n", routers_ordered[j].ttl);
+        //printf("TLL is %d \n", routers_ordered[j].ttl);
         if (i==0){
           curr_ttl = routers_ordered[j].ttl;
           first = 1;
@@ -327,7 +327,7 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
   i=0;
   for (;i<MAX_STR_LEN; i++){
     if(rtt_for_calc[i].to_print == 1){
-      printf("%d\n",i);
+      //printf("%d\n",i);
       int a = 0;
       double mean = 0;
       double mean_for_sd = 0;
