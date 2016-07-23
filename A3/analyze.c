@@ -31,10 +31,13 @@ int list_index = 0;
 int list_index_udp = 0;
 int first_id;
 int echo;
+int looking_match_frag;
 char src[MAX_STR_LEN];
 struct RTT RTTs[MAX_STR_LEN];
 struct router udps[MAX_HOPS];
+struct router fragments_to_match[MAX_HOPS];
 int max_ttl = 0;
+int fragment_index;
 
 int main(int argc, char **argv)
 {
@@ -211,7 +214,7 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
 
     //curr_ttl = udps[j].ttl;
     if (RTTs[j].src_addr != NULL && RTTs[j].src_addr[0] != '\0' && echo == 0){
-      printf("TTL IS %d and j %d\n", udps[j].ttl,j);
+      //printf("TTL IS %d and j %d\n", udps[j].ttl,j);
       if (j==0){
         curr_ttl = udps[j].ttl;
         first = 1;
@@ -293,7 +296,7 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
 
 
   i=1;
-  printf("max_ttl is %d \n", max_ttl);
+  //printf("max_ttl is %d \n", max_ttl);
   for(; i < max_ttl+1; i++){
       if (echo == 0){
         printf("  router %d : %s \n",i, rtt_for_calc[i].dst_addr);
@@ -323,9 +326,35 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
       }
     }
   }
-
-  printf("\nThe number of fragments created from the original datagram is: %d \n", fragments);
-  printf("The offset of the last frament is: %d \n", last_frag);
+struct fragment fragment_list[MAX_HOPS];
+  if (fragments != 0){
+    //printf("fragment index is %d\n", fragment_index);
+    for(i=0;i<fragment_index;i++){
+      //printf("%d\n", i);
+      if (fragments_to_match[i].offset > 0){
+        int looking_for_id = fragments_to_match[i].id;
+        for(j=0;j<fragment_index; j++){
+          if (j != i){
+            if(fragments_to_match[j].id == looking_for_id){
+              if (fragments_to_match[j].mf == 1){
+                //printf("OFFSET %d \n", fragments_to_match[i].offset);
+                fragment_list[j].count = 2;
+                fragment_list[j].offset = fragments_to_match[i].offset;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  if (echo == 0 && fragments != 0){
+    for (i=0; i<fragment_index;i++){
+      if (fragment_list[i].count != 0 && fragment_list[i].offset > 0){
+        printf("\nThe number of fragments created from the original datagram is: %d \n", fragment_list[i].count);
+        printf("The offset of the last fragment is: %d \n", fragment_list[i].offset*8);
+      }
+    }
+  }
 
 
         /*
@@ -505,6 +534,9 @@ int analyze_packet (struct ip *ip, const unsigned char*packet,struct router rout
   temp = ip->ip_id;
   id = (temp>>8)|(temp<<8);
 
+
+  //printf("ID outside of everything is %d \n", id);
+
   //pakcet if ICMP
   if(ip->ip_p == 1){
     //printf("ICMP with id is %d\n", id );
@@ -569,6 +601,7 @@ int analyze_packet (struct ip *ip, const unsigned char*packet,struct router rout
           //get offset value
           temp = ip->ip_off & 0xFF1F;
           offset = (temp>>8)|(temp<<8);
+          printf("offset is %d \n", offset);
           //calculate vaue of offset if there are no more fragments
           if(mf == 0){
             last_frag=offset*8;
@@ -599,22 +632,29 @@ int analyze_packet (struct ip *ip, const unsigned char*packet,struct router rout
    //printf("%d\n",ntohs(udp->uh_dport) >= 33434 && ntohs(udp->uh_dport));
 
     if ((ntohs(udp->uh_dport) >= 33434 && ntohs(udp->uh_dport) <= 33534)){
+      //printf("ID is %d \n",id);
+      //printf("UDP with id is %d\n", id );
+      //printf("Looking for id %d\n",udps[looking_match_frag].first_id);
       //printf("UDP with id is %d\n", id );
       if (first_id == 0 && ip->ip_ttl == 1 ){
-        //first_id =
+        udps[list_index_udp].first_id = id;
         strcpy(ult_dst,inet_ntoa(ip->ip_dst));
         strcpy(src, inet_ntoa(ip->ip_src));
         add_time(ip,id,ts,times);
         //set ID of first packet
-         temp= ip->ip_id;
-         first_id = (temp>>8)|(temp<<8);
+         //temp= ip->ip_id;
+         //first_id = (temp>>8)|(temp<<8);
          //Get MF flag value
          mf = (ip->ip_off & 0x0020) >> 5;
          //if MF is set, incerement total number of fragments
          if (mf == 1){
+           looking_match_frag = list_index_udp;
+            udps[list_index].fragments++;
             fragments++;
           }
       }
+
+
       mf = (ip->ip_off & 0x0020) >> 5;
       if (mf == 1){
         fragments++;
@@ -626,6 +666,21 @@ int analyze_packet (struct ip *ip, const unsigned char*packet,struct router rout
 
 
     }
+
+    temp = ip->ip_id;
+    id = (temp>>8)|(temp<<8);
+    //printf("id is %d\n",id);
+    temp = ip->ip_off & 0xFF1F;
+    offset = (temp>>8)|(temp<<8);
+    printf("id is %d with offset is %d \n", id, offset);
+    mf = (ip->ip_off & 0x0020) >> 5;
+
+    fragments_to_match[fragment_index].id = id;
+    fragments_to_match[fragment_index].offset = offset;
+    printf("OFFSET OFFSET OFFSET %d\n",fragments_to_match[fragment_index].offset = offset);
+    fragments_to_match[fragment_index].mf = mf;
+    //printf("MF MF MF MF MF MF MF %d\n", fragments_to_match[fragment_index].mf);
+    fragment_index++;
     //printf("First ID is %d and id is %d \n", first_id, id);
 
     //printf(" MF flag is %d\n",mf );
@@ -636,12 +691,14 @@ int analyze_packet (struct ip *ip, const unsigned char*packet,struct router rout
 
     return 1;
   } else if (ip->ip_p == 6){
+    //printf("TCP id is %d\n", id );
     protocols[6] = 1;
     return 1;
   } else {
     if (ip->ip_p < 31){
       protocols[ip->ip_p] == 1;
     }
+    //printf("Something else with id is %d\n", id );
     return 1;
   }
   //printf("In here\n");
