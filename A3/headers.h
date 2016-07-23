@@ -48,6 +48,7 @@ struct router {
   int id;
   int offset;
   int ttl;
+  int type;
 };
 
 

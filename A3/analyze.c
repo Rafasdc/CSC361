@@ -95,6 +95,7 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
     //printf("  router %d with dest port %d : %s \n",i, routers[i].port_dst, routers[i].src_addr);
   }
 
+  char *intermediate_routers_ip[MAX_STR_LEN];
   if (echo == 1){
     i = 0;
     for(; i < list_index+1; i++){
@@ -102,6 +103,31 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
 
       routers_ordered[i] = routers[i];
       //printf("TTL IS %d and j %d\n", routers_ordered[i].ttl,i);
+    }
+
+      i=0;
+    int first = 1;
+    for(; i < list_index+1; i++){
+        //printf("routers_ordered %d \n", routers_ordered[i].type);
+        if (routers_ordered[i].type == 11){
+          int compare;
+          int pos;
+          if (first == 1){
+            first = 0;
+            intermediate_routers_ip[i] = routers_ordered[i].src_addr;
+            pos = i;
+            continue;
+          }
+          if (intermediate_routers_ip[pos] != NULL){
+              //printf("Comparing %s with %s \n", intermediate_routers_ip[pos],routers_ordered[i].src_addr );
+             compare = strcmp(intermediate_routers_ip[pos],routers_ordered[i].src_addr);
+             //printf("Compare is %d\n", compare);
+          }
+          if(compare != 0){
+            intermediate_routers_ip[pos+1] = routers_ordered[i].src_addr;
+            pos++;
+          }
+        }
     }
   }
   //printf("after echo \n");
@@ -267,9 +293,13 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
 
 
   i=1;
-  //printf("max_ttl is %d \n", max_ttl);
+  printf("max_ttl is %d \n", max_ttl);
   for(; i < max_ttl+1; i++){
-      printf("  router %d : %s \n",i, rtt_for_calc[i].dst_addr);
+      if (echo == 0){
+        printf("  router %d : %s \n",i, rtt_for_calc[i].dst_addr);
+      } else if (echo ==1 && i < max_ttl){
+        printf("  router %d : %s \n",i, intermediate_routers_ip[i]);
+      }
   }
 
   //printf("  router %d with dest port %d : %s \n",i, routers[i].port_dst, routers[i].src_addr);
@@ -363,7 +393,11 @@ void print_info(struct router routers[MAX_HOPS], struct outgoing times[MAX_HOPS]
       //printf("sd is %f \n", sd);
       rtt_for_calc[i].sd = sd;
 
-      printf("The avg RTT between %s and %s  is: %f ms, the s.d is: %f ms \n",rtt_for_calc[i].src_addr,rtt_for_calc[i].dst_addr,rtt_for_calc[i].mean*1000, rtt_for_calc[i].sd);
+      if (echo == 0){
+        printf("The avg RTT between %s and %s  is: %f ms, the s.d is: %f ms \n",rtt_for_calc[i].src_addr,rtt_for_calc[i].dst_addr,rtt_for_calc[i].mean*1000, rtt_for_calc[i].sd);
+      } else if (echo == 1 && i < max_ttl){
+        printf("The avg RTT between %s and %s  is: %f ms, the s.d is: %f ms \n",rtt_for_calc[i].src_addr,intermediate_routers_ip[i],rtt_for_calc[i].mean*1000, rtt_for_calc[i].sd);
+      }
     }
   }
 
@@ -500,7 +534,7 @@ int analyze_packet (struct ip *ip, const unsigned char*packet,struct router rout
 
 
         add_to_list(routers,packet,ip,protocols,ts,times);
-        //routers[list_index].sequence = icmp->sequence;
+        routers[list_index].type = 11;
         list_index++;
 
 
